@@ -6,6 +6,7 @@ import { ClubProvider } from '@/context/ClubContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { Header } from '@/components/layout/Header';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'MSW Badminton | Badminton Club',
@@ -41,6 +42,7 @@ export default function RootLayout({
             </ClubProvider>
           </ThemeProvider>
         </FirebaseClientProvider>
+        <Analytics />
       </body>
     </html>
   );
