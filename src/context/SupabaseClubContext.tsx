@@ -39,7 +39,7 @@ interface ClubContextType {
   deleteMatch: (matchId: string) => Promise<void>
   createSession: (sessionDate: string) => Promise<string>
   addPlayerToSession: (sessionId: string, playerId: string) => Promise<void>
-  ingestPlayersFromList: (names: string[], sessionDate: string) => Promise<void>
+  ingestPlayersFromList: (names: string[], sessionDate: string) => Promise<{ newPlayersCount: number; existingPlayersCount: number }>
 }
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined)
@@ -710,92 +710,150 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
   const addPlayerToSession = async (sessionId: string, playerId: string) => {
     const { error } = await supabase
       .from('session_participation')
-      .insert({ session_id: sessionId, player_id: playerId })
+      .select()
+      .eq('session_id', sessionId)
+      .eq('player_id', playerId)
+      .single()
 
-    if (error) throw error
-    loadData()
+    if (error && error.code === 'PGRST116') {
+      // Record doesn't exist, insert it
+      const { error: insertError } = await supabase
+        .from('session_participation')
+        .insert({ session_id: sessionId, player_id: playerId })
+
+      if (insertError) throw insertError
+      loadData()
+    } else if (error) {
+      throw error
+    }
+    // If record exists, do nothing (already linked)
   }
 
   const ingestPlayersFromList = async (names: string[], sessionDate: string) => {
-    // Create or get session
-    let sessionId = sessions.find(s => s.sessionDate === sessionDate)?.id
-    if (!sessionId) {
-      sessionId = await createSession(sessionDate)
-    }
-
-    // Parse names and handle uniqueness
-    const nameMap = new Map<string, { firstName: string; lastName: string; fullName: string }>()
-    const firstNameCount = new Map<string, number>()
-
-    names.forEach(name => {
-      const trimmed = name.trim()
-      if (!trimmed) return
-
-      const parts = trimmed.split(' ')
-      const firstName = parts[0]
-      const lastName = parts.slice(1).join(' ')
-      const fullName = trimmed
-
-      nameMap.set(fullName, { firstName, lastName, fullName })
-      firstNameCount.set(firstName, (firstNameCount.get(firstName) || 0) + 1)
-    })
-
-    // Generate display names with uniqueness check
-    const playersToCreate: { full_name: string; display_name: string; name: string }[] = []
-    const existingPlayers = players
-
-    for (const [fullName, nameData] of nameMap) {
-      const { firstName, lastName } = nameData
-      let displayName = firstName
-
-      // If duplicate first name, append surname initial
-      if ((firstNameCount.get(firstName) || 0) > 1 && lastName) {
-        displayName = `${firstName} ${lastName.charAt(0)}.`
+    try {
+      // Create or get session
+      let sessionId = sessions.find(s => s.sessionDate === sessionDate)?.id
+      if (!sessionId) {
+        sessionId = await createSession(sessionDate)
       }
 
-      // Check if player already exists by full_name
-      const existingPlayer = existingPlayers.find(p => p.name === fullName)
-      if (existingPlayer) {
-        // Link existing player to session
-        await addPlayerToSession(sessionId, existingPlayer.id)
-      } else {
-        // Mark for creation
-        playersToCreate.push({
-          full_name: fullName,
-          display_name: displayName,
-          name: displayName // Use display_name as the main name field for now
-        })
-      }
-    }
+      // Parse names and handle uniqueness - filter empty lines and duplicates
+      const uniqueNames = [...new Set(names.map(n => n.trim()).filter(n => n.length > 0))]
+      const nameMap = new Map<string, { firstName: string; lastName: string; fullName: string }>()
+      const firstNameCount = new Map<string, number>()
 
-    // Batch create new players
-    if (playersToCreate.length > 0) {
-      const { data: newPlayers, error } = await supabase
+      uniqueNames.forEach(name => {
+        const trimmed = name.trim()
+        if (!trimmed) return
+
+        const parts = trimmed.split(' ')
+        const firstName = parts[0]
+        const lastName = parts.slice(1).join(' ')
+        const fullName = trimmed
+
+        nameMap.set(fullName, { firstName, lastName, fullName })
+        firstNameCount.set(firstName, (firstNameCount.get(firstName) || 0) + 1)
+      })
+
+      // Check database for existing players by full_name
+      const fullNamesToCheck = Array.from(nameMap.keys())
+      const { data: existingDbPlayers, error: queryError } = await supabase
         .from('players')
-        .insert(playersToCreate.map(p => ({
-          name: p.name,
-          full_name: p.full_name,
-          display_name: p.display_name,
-          skill_level: 3,
-          wins: 0,
-          games_played: 0,
-          partner_history: [],
-          status: 'available',
-          improvement_score: 0,
-          total_play_time_minutes: 0
-        })))
-        .select()
+        .select('id, name, full_name')
+        .in('full_name', fullNamesToCheck)
 
-      if (error) throw error
+      if (queryError) {
+        console.error('Error querying existing players:', queryError)
+        throw queryError
+      }
 
-      // Link new players to session
-      if (newPlayers) {
-        for (const player of newPlayers) {
-          await addPlayerToSession(sessionId, player.id)
+      const existingPlayersMap = new Map(existingDbPlayers?.map(p => [p.full_name, p]) || [])
+
+      // Generate display names with uniqueness check
+      const playersToUpsert: { full_name: string; display_name: string; name: string }[] = []
+      let existingPlayersCount = 0
+      const playersToLink: string[] = []
+
+      for (const [fullName, nameData] of nameMap) {
+        const { firstName, lastName } = nameData
+        let displayName = firstName
+
+        // If duplicate first name, append surname initial
+        if ((firstNameCount.get(firstName) || 0) > 1 && lastName) {
+          displayName = `${firstName} ${lastName.charAt(0)}.`
+        }
+
+        // Check if player already exists in database by full_name
+        const existingDbPlayer = existingPlayersMap.get(fullName)
+        if (existingDbPlayer) {
+          // Link existing player to session
+          playersToLink.push(existingDbPlayer.id)
+          existingPlayersCount++
+        } else {
+          // Mark for upsert
+          playersToUpsert.push({
+            full_name: fullName,
+            display_name: displayName,
+            name: displayName // Use display_name as the main name field for now
+          })
         }
       }
 
-      loadData()
+      // Link existing players to session (ignore duplicates)
+      if (playersToLink.length > 0) {
+        for (const playerId of playersToLink) {
+          await addPlayerToSession(sessionId, playerId)
+        }
+      }
+
+      // Batch upsert new players using upsert to handle duplicates
+      let newPlayersCount = 0
+
+      if (playersToUpsert.length > 0) {
+        const { data: newPlayers, error } = await supabase
+          .from('players')
+          .upsert(playersToUpsert.map(p => ({
+            name: p.name,
+            full_name: p.full_name,
+            display_name: p.display_name,
+            skill_level: 3,
+            wins: 0,
+            games_played: 0,
+            partner_history: [],
+            status: 'available',
+            improvement_score: 0,
+            total_play_time_minutes: 0
+          })), {
+            onConflict: 'full_name',
+            ignoreDuplicates: false
+          })
+          .select()
+
+        if (error) throw error
+
+        newPlayersCount = newPlayers?.length || 0
+
+        // Link new players to session
+        if (newPlayers) {
+          for (const player of newPlayers) {
+            await addPlayerToSession(sessionId, player.id)
+          }
+        }
+
+        loadData()
+      }
+
+      return { newPlayersCount, existingPlayersCount }
+    } catch (error: any) {
+      // 1. Log properties individually as strings
+      console.error('Error Code:', error.code);
+      console.error('Error Message:', error.message);
+      console.error('Error Details:', error.details);
+
+      // 2. Force full serialization for the console
+      console.log('JSON Error:', JSON.stringify(error, null, 2));
+
+      throw error;
     }
   }
 

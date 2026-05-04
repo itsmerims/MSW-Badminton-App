@@ -95,7 +95,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl h-full overflow-auto">
+    <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl">
       <header className="space-y-1">
         <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
           <SettingsIcon className="h-8 w-8 text-primary" /> Settings

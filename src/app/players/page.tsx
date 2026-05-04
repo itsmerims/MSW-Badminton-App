@@ -88,7 +88,7 @@ export default function PlayersPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 max-w-7xl h-full overflow-auto">
+    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 max-w-7xl">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="space-y-0.5">
           <h1 className="flex items-center gap-2 md:gap-3">

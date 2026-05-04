@@ -33,13 +33,17 @@ export function ListGetter() {
     setIsProcessing(true)
     try {
       const names = namesText.split('\n').map(n => n.trim()).filter(n => n.length > 0)
-      await ingestPlayersFromList(names, sessionDate)
-      toast({ title: 'Players ingested successfully' })
+      const result = await ingestPlayersFromList(names, sessionDate)
+      toast({
+        title: 'Players ingested successfully',
+        description: `${result.newPlayersCount} new, ${result.existingPlayersCount} already existed`
+      })
       setNamesText('')
       setIsOpen(false)
     } catch (error) {
       console.error('Error ingesting players:', error)
-      toast({ title: 'Failed to ingest players', variant: 'destructive' })
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
+      toast({ title: 'Failed to ingest players', description: error instanceof Error ? error.message : String(error), variant: 'destructive' })
     } finally {
       setIsProcessing(false)
     }

@@ -5,6 +5,14 @@
 ALTER TABLE players ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS display_name TEXT;
 
+-- Add unique constraint on full_name for upsert operations
+ALTER TABLE players ADD CONSTRAINT players_full_name_key UNIQUE (full_name);
+
+-- Add anon policy to players table for local development
+DROP POLICY IF EXISTS "Allow full access for anon role" ON players;
+CREATE POLICY "Allow full access for anon role" ON players
+  FOR ALL USING (auth.role() = 'anon');
+
 -- Create sessions table (for tracking play sessions on specific dates)
 CREATE TABLE IF NOT EXISTS sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -30,12 +38,19 @@ CREATE INDEX IF NOT EXISTS idx_session_participation_player_id ON session_partic
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_participation ENABLE ROW LEVEL SECURITY;
 
--- Allow read access for authenticated users
-CREATE POLICY "Allow read access for authenticated users" ON sessions
-  FOR SELECT USING (auth.role() = 'authenticated');
+-- Allow full access for anon role (for local development)
+CREATE POLICY "Allow full access for anon role" ON sessions
+  FOR ALL USING (auth.role() = 'anon');
 
-CREATE POLICY "Allow read access for authenticated users" ON session_participation
-  FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow full access for anon role" ON session_participation
+  FOR ALL USING (auth.role() = 'anon');
+
+-- Allow full access for authenticated users
+CREATE POLICY "Allow full access for authenticated users" ON sessions
+  FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Allow full access for authenticated users" ON session_participation
+  FOR ALL USING (auth.role() = 'authenticated');
 
 -- Allow full access for service role (admin operations)
 CREATE POLICY "Allow full access for service role" ON sessions
