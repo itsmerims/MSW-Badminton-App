@@ -264,7 +264,13 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
     }
 
     const { error } = await supabase.from('courts').insert(newCourt)
-    if (!error) {
+    if (error) {
+      console.error('Error adding court:', error)
+      console.error('Error Code:', error.code);
+      console.error('Error Message:', error.message);
+      console.error('Error Details:', error.details);
+      console.log('JSON Error:', JSON.stringify(error, null, 2));
+    } else {
       setCourts(prev => [...prev, newCourt])
     }
     return id
