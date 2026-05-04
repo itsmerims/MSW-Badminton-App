@@ -256,11 +256,11 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
     const nextNum = courtNumbers.length > 0 ? Math.max(...courtNumbers) + 1 : 1
 
     const id = generateId()
-    const newCourt: Court = {
+    const newCourt = {
       id,
       name: name ? `Court ${name}` : `Court ${nextNum}`,
       status: 'available',
-      currentMatchId: null
+      current_match_id: null
     }
 
     const { error } = await supabase.from('courts').insert(newCourt)
@@ -271,7 +271,12 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
       console.error('Error Details:', error.details);
       console.log('JSON Error:', JSON.stringify(error, null, 2));
     } else {
-      setCourts(prev => [...prev, newCourt])
+      setCourts(prev => [...prev, {
+        id,
+        name: newCourt.name,
+        status: newCourt.status as 'available',
+        currentMatchId: null
+      }])
     }
     return id
   }
