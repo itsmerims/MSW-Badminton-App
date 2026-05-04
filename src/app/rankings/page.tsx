@@ -1,6 +1,6 @@
 "use client";
 
-import { useClub } from '@/context/ClubContext';
+import { useSupabaseClub } from '@/context/SupabaseClubContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trophy, TrendingUp, Medal, Star, Target, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -10,11 +10,11 @@ import { useMemo } from 'react';
 import { Match, SKILL_LEVELS_SHORT, getSkillColor } from '@/lib/types';
 
 export default function RankingsPage() {
-  const { players, matches } = useClub();
+  const { players, matches } = useSupabaseClub();
 
   const getRankingsForPeriod = (periodMatches: Match[]) => {
     const stats: Record<string, { wins: number; total: number; diff: number }> = {};
-    
+
     periodMatches.forEach(m => {
       if (m.status !== 'completed') return;
       const pIds = [...m.teamA, ...m.teamB];
@@ -92,20 +92,20 @@ export default function RankingsPage() {
               </div>
             </div>
             <div className="flex gap-4 items-center shrink-0">
-               <div className="text-center">
-                  <p className="text-lg font-black text-primary">{player.wins}</p>
-                  <p className="text-[7px] font-black uppercase text-muted-foreground">W</p>
-               </div>
-               <div className="text-center">
-                  <p className="text-compact font-black opacity-60">{player.winRate.toFixed(0)}%</p>
-                  <p className="text-[7px] font-black uppercase text-muted-foreground">WR</p>
-               </div>
-               <div className="text-right min-w-[32px]">
-                  <p className={cn("text-tiny font-black", player.pointDiff > 0 ? "text-green-600" : "text-destructive")}>
-                    {player.pointDiff > 0 ? `+${player.pointDiff}` : player.pointDiff}
-                  </p>
-                  <p className="text-[7px] font-black uppercase text-muted-foreground">DIFF</p>
-               </div>
+              <div className="text-center">
+                <p className="text-lg font-black text-primary">{player.wins}</p>
+                <p className="text-[7px] font-black uppercase text-muted-foreground">W</p>
+              </div>
+              <div className="text-center">
+                <p className="text-compact font-black opacity-60">{player.winRate.toFixed(0)}%</p>
+                <p className="text-[7px] font-black uppercase text-muted-foreground">WR</p>
+              </div>
+              <div className="text-right min-w-[32px]">
+                <p className={cn("text-tiny font-black", player.pointDiff > 0 ? "text-green-600" : "text-destructive")}>
+                  {player.pointDiff > 0 ? `+${player.pointDiff}` : player.pointDiff}
+                </p>
+                <p className="text-[7px] font-black uppercase text-muted-foreground">DIFF</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -120,10 +120,10 @@ export default function RankingsPage() {
   );
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6 max-w-5xl">
-      <header className="space-y-0.5 text-center sm:text-left">
-        <h1 className="flex items-center justify-center sm:justify-start gap-3">
-          <Trophy className="h-8 w-8 text-primary" /> Leaderboards
+    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6 max-w-5xl h-full overflow-auto">
+      <header className="space-y-0.5 text-center sm:text-left shrink-0">
+        <h1 className="flex items-center justify-center sm:justify-start gap-2 md:gap-3">
+          <Trophy className="h-6 w-6 md:h-8 md:w-8 text-primary" /> Leaderboards
         </h1>
         <p className="text-tiny text-muted-foreground font-black uppercase tracking-widest opacity-60">Hall of fame based on tournament stats</p>
       </header>
@@ -142,10 +142,10 @@ export default function RankingsPage() {
             <Medal className="h-2.5 w-2.5 text-primary" /> Wins {'>'} Rate {'>'} Diff
           </div>
         </div>
-        <TabsContent value="daily" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <TabsContent value="daily">
           <RenderLeaderboard data={dailyRankings} />
         </TabsContent>
-        <TabsContent value="monthly" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <TabsContent value="monthly">
           <RenderLeaderboard data={monthlyRankings} />
         </TabsContent>
       </Tabs>

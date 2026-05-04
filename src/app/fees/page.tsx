@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
-import { useClub } from '@/context/ClubContext';
+import { useSupabaseClub } from '@/context/SupabaseClubContext';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,9 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment } = useSupabaseClub();
   const [today, setToday] = useState<string>('');
-  
+
   const [shuttleFee, setShuttleFee] = useState(0);
   const [courtFee, setCourtFee] = useState(0);
   const [entranceFee, setEntranceFee] = useState(0);
@@ -44,15 +44,15 @@ export default function FeesPage() {
   }, [players, currentFee]);
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8 pb-24 max-w-5xl">
-      <header className="space-y-1">
-        <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
-          <Banknote className="h-8 w-8 text-green-600" /> Club Fees
+    <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl h-full overflow-auto">
+      <header className="space-y-1 shrink-0">
+        <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
+          <Banknote className="h-6 w-6 md:h-8 md:w-8 text-green-600" /> Club Fees
         </h1>
-        <p className="text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-60">Daily finance & payment tracking</p>
+        <p className="text-xs md:text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-60">Daily finance & payment tracking</p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
         <Card className="lg:col-span-5 border-2 shadow-lg bg-card overflow-hidden">
           <CardHeader className="bg-primary/5 border-b">
             <CardTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">

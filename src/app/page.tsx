@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useClub } from '@/context/ClubContext';
+import { useSupabaseClub } from '@/context/SupabaseClubContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -59,25 +59,26 @@ function WaitTimeBadge({ lastAvailableAt }: { lastAvailableAt?: number }) {
 }
 
 export default function HomePage() {
-  const { 
-    courts, players, matches, deleteCourt, startMatch, startTimer, 
+  const {
+    players, matches, courts,
+    deleteCourt, startMatch, startTimer,
     endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch,
     updateMatchScore, addCourt, deleteMatch, defaultWinningScore
-  } = useClub();
+  } = useSupabaseClub();
   const { toast } = useToast();
-  
+
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);
   const [winningTeam, setWinningTeam] = useState<{ courtId: string; team: 'teamA' | 'teamB' } | null>(null);
   const [loserScore, setLoserScore] = useState<string>('');
   const [mounted, setMounted] = useState(false);
-  
+
   const [draftPlayerIds, setDraftPlayerIds] = useState<string[]>([]);
-  const [courtDrafts, setCourtDrafts] = useState<Record<string, string[]>>({}); 
-  
+  const [courtDrafts, setCourtDrafts] = useState<Record<string, string[]>>({});
+
   const [isQueueOver, setIsQueueOver] = useState(false);
   const [overCourtId, setOverCourtId] = useState<string | null>(null);
   const [isCourtPanelOver, setIsCourtPanelOver] = useState(false);
-  
+
   const [sortOption, setSortOption] = useState<string>('default');
   const loserScoreInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,7 +123,7 @@ export default function HomePage() {
         return result || (a.lastAvailableAt || 0) - (b.lastAvailableAt || 0);
       });
   }, [players, allDraftedIds, sortOption]);
-  
+
   const waitingMatches = useMemo(() => {
     return matches.filter(m => !m.isCompleted && !m.courtId).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [matches]);
@@ -182,7 +183,7 @@ export default function HomePage() {
     }
   };
 
-  const onDropInCourtPanel = (e: React.DragEvent) => {
+  const onDropInCourtPanel = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsCourtPanelOver(false);
     const matchId = e.dataTransfer.getData("matchId");
@@ -190,7 +191,7 @@ export default function HomePage() {
     if (matchId) { createCourtAndAssignMatch(matchId); return; }
     if (playerId) {
       if (allDraftedIds.includes(playerId)) return;
-      const newCourtId = addCourt();
+      const newCourtId = await addCourt();
       setCourtDrafts(prev => ({ ...prev, [newCourtId]: [playerId] }));
     }
   };
@@ -261,7 +262,7 @@ export default function HomePage() {
   const handleWinSubmit = () => {
     if (!winningTeam) return;
     const lScore = parseInt(loserScore) || 0;
-    
+
     const tAScore = winningTeam.team === 'teamA' ? defaultWinningScore : lScore;
     const tBScore = winningTeam.team === 'teamB' ? defaultWinningScore : lScore;
 
@@ -273,10 +274,10 @@ export default function HomePage() {
 
     const courtId = winningTeam.courtId;
     const winner = winningTeam.team;
-    
+
     // Clear winningTeam dialog first to prevent modal state lock
     setWinningTeam(null);
-    
+
     if (lScore === 0) {
       setPendingMatchFinish({ courtId, winner, scoreA: tAScore, scoreB: tBScore });
     } else {
@@ -285,9 +286,9 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-background overflow-hidden">
+    <div className="flex flex-col h-full bg-background overflow-hidden">
       <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12">
-        
+
         {/* THE BENCH */}
         <div className="md:col-span-3 border-r flex flex-col bg-secondary/5 min-h-0">
           <div className="p-3 bg-card border-b flex items-center justify-between sticky top-0 z-10 gap-2 h-14">
@@ -313,9 +314,9 @@ export default function HomePage() {
           <ScrollArea className="flex-1">
             <div className="p-2 grid grid-cols-2 gap-2 pb-24">
               {sortedAvailablePlayers.map((player) => (
-                <Card 
-                  key={player.id} 
-                  draggable 
+                <Card
+                  key={player.id}
+                  draggable
                   onDragStart={(e) => onDragStartPlayer(e, player.id)}
                   className="p-3 cursor-grab active:cursor-grabbing hover:border-primary transition-all border-2 shadow-sm group bg-card min-w-0"
                 >
@@ -339,7 +340,7 @@ export default function HomePage() {
         </div>
 
         {/* MATCH QUEUE */}
-        <div 
+        <div
           className={cn(
             "md:col-span-3 border-r flex flex-col bg-background transition-all min-h-0",
             isQueueOver ? "ring-4 ring-inset ring-primary/20 bg-primary/5" : ""
@@ -377,20 +378,20 @@ export default function HomePage() {
                 </Card>
               )}
               {waitingMatches.map((match, index) => (
-                <Card 
-                  key={match.id} 
-                  draggable 
+                <Card
+                  key={match.id}
+                  draggable
                   onDragStart={(e) => onDragStartMatch(e, match.id)}
                   className="border-2 border-primary/30 bg-primary/5 cursor-grab active:cursor-grabbing hover:border-primary transition-all shadow-sm overflow-hidden group relative"
                 >
                   <div className="absolute top-1 left-1 z-10">
                     <Badge variant="secondary" className="bg-primary text-primary-foreground text-[9px] h-4 px-1 font-black">
-                       #{index + 1}
+                      #{index + 1}
                     </Badge>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive hover:text-white z-10"
                     onClick={() => handleDeleteMatch(match.id)}
                   >
@@ -404,10 +405,10 @@ export default function HomePage() {
                         return (
                           <div key={id} className="flex items-center gap-1.5 min-w-0 group/p">
                             <span className="text-[11px] font-black truncate leading-tight flex-1">{p?.name}</span>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-3.5 w-3.5 opacity-0 group-hover/p:opacity-100 shrink-0" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-3.5 w-3.5 opacity-0 group-hover/p:opacity-100 shrink-0"
                               onClick={() => setSwapping({ matchId: match.id, oldPlayerId: id })}
                             >
                               <ArrowLeftRight className="h-2.5 w-2.5" />
@@ -424,10 +425,10 @@ export default function HomePage() {
                         const p = players.find(player => player.id === id);
                         return (
                           <div key={id} className="flex items-center gap-1.5 min-w-0 justify-end group/p">
-                             <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-3.5 w-3.5 opacity-0 group-hover/p:opacity-100 shrink-0" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-3.5 w-3.5 opacity-0 group-hover/p:opacity-100 shrink-0"
                               onClick={() => setSwapping({ matchId: match.id, oldPlayerId: id })}
                             >
                               <ArrowLeftRight className="h-2.5 w-2.5" />
@@ -449,7 +450,7 @@ export default function HomePage() {
         </div>
 
         {/* ACTIVE COURTS */}
-        <div 
+        <div
           className={cn(
             "md:col-span-6 flex flex-col transition-all min-h-0",
             isCourtPanelOver ? "bg-green-500/5" : "bg-secondary/5"
@@ -472,10 +473,10 @@ export default function HomePage() {
                 const draft = courtDrafts[court.id];
                 const teamAScore = match?.teamAScore || 0;
                 const teamBScore = match?.teamBScore || 0;
-                
+
                 return (
-                  <Card 
-                    key={court.id} 
+                  <Card
+                    key={court.id}
                     onDragOver={(e) => { e.stopPropagation(); e.preventDefault(); if (court.status === 'available') setOverCourtId(court.id); }}
                     onDragLeave={() => setOverCourtId(null)}
                     onDrop={(e) => { e.stopPropagation(); onDropInCourt(e, court.id); }}
@@ -497,36 +498,36 @@ export default function HomePage() {
                           <div className="flex justify-between items-center mb-1">
                             <LiveTimer startTime={match.startTime} />
                             <div className="flex gap-1">
-                               <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  className="h-6 text-[8px] font-black px-1.5" 
-                                  disabled={!match.startTime}
-                                  onClick={() => {
-                                    if (!match.startTime) {
-                                      toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
-                                      return;
-                                    }
-                                    setWinningTeam({ courtId: court.id, team: 'teamA' });
-                                  }}
-                               >
-                                  T1 WIN
-                               </Button>
-                               <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  className="h-6 text-[8px] font-black px-1.5" 
-                                  disabled={!match.startTime}
-                                  onClick={() => {
-                                    if (!match.startTime) {
-                                      toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
-                                      return;
-                                    }
-                                    setWinningTeam({ courtId: court.id, team: 'teamB' });
-                                  }}
-                               >
-                                  T2 WIN
-                               </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[8px] font-black px-1.5"
+                                disabled={!match.startTime}
+                                onClick={() => {
+                                  if (!match.startTime) {
+                                    toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
+                                    return;
+                                  }
+                                  setWinningTeam({ courtId: court.id, team: 'teamA' });
+                                }}
+                              >
+                                T1 WIN
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-6 text-[8px] font-black px-1.5"
+                                disabled={!match.startTime}
+                                onClick={() => {
+                                  if (!match.startTime) {
+                                    toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
+                                    return;
+                                  }
+                                  setWinningTeam({ courtId: court.id, team: 'teamB' });
+                                }}
+                              >
+                                T2 WIN
+                              </Button>
                             </div>
                           </div>
                           <div className="grid grid-cols-1 gap-2 flex-1">
@@ -576,7 +577,7 @@ export default function HomePage() {
                               );
                             })}
                           </div>
-                          <Button variant="ghost" size="sm" className="w-full h-8 text-[9px] font-black" onClick={() => setCourtDrafts(prev => { const n = {...prev}; delete n[court.id]; return n; })}>CANCEL</Button>
+                          <Button variant="ghost" size="sm" className="w-full h-8 text-[9px] font-black" onClick={() => setCourtDrafts(prev => { const n = { ...prev }; delete n[court.id]; return n; })}>CANCEL</Button>
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center opacity-10 py-8">
@@ -585,13 +586,13 @@ export default function HomePage() {
                         </div>
                       )}
                     </CardContent>
-                    
+
                     {court.status === 'occupied' && match && (
                       <div className="p-3 bg-secondary/20 border-t space-y-2">
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1 flex flex-col gap-1">
                             <span className="text-[9px] font-black uppercase opacity-40 text-center">T1</span>
-                            <Input 
+                            <Input
                               type="number" min="0"
                               className={cn("h-12 text-2xl font-black text-center border-2 no-spinner", teamAScore > teamBScore ? "border-primary bg-primary/5" : "bg-card")}
                               value={match.teamAScore === 0 ? "" : match.teamAScore}
@@ -603,7 +604,7 @@ export default function HomePage() {
                           <div className="text-lg font-black opacity-20 mt-4 shrink-0">VS</div>
                           <div className="flex-1 flex flex-col gap-1">
                             <span className="text-[9px] font-black uppercase opacity-40 text-center">T2</span>
-                            <Input 
+                            <Input
                               type="number" min="0"
                               className={cn("h-12 text-2xl font-black text-center border-2 no-spinner", teamBScore > teamAScore ? "border-primary bg-primary/5" : "bg-card")}
                               value={match.teamBScore === 0 ? "" : match.teamBScore}
@@ -625,12 +626,12 @@ export default function HomePage() {
                             </Button>
                           ) : (
                             <div className="flex w-full gap-2">
-                               <Button onClick={() => handleFinishMatch(court.id, teamAScore, teamBScore)} className="flex-1 h-10 bg-primary font-black text-tiny uppercase px-2 truncate">
-                                  FINISH
-                               </Button>
-                               <Button variant="outline" size="icon" onClick={() => endMatch(court.id, 'cancelled')} className="h-10 w-10 p-0 border-2 shrink-0">
-                                  <Ban className="h-3.5 w-3.5 text-destructive" />
-                               </Button>
+                              <Button onClick={() => handleFinishMatch(court.id, teamAScore, teamBScore)} className="flex-1 h-10 bg-primary font-black text-tiny uppercase px-2 truncate">
+                                FINISH
+                              </Button>
+                              <Button variant="outline" size="icon" onClick={() => endMatch(court.id, 'cancelled')} className="h-10 w-10 p-0 border-2 shrink-0">
+                                <Ban className="h-3.5 w-3.5 text-destructive" />
+                              </Button>
                             </div>
                           )}
                         </>
@@ -679,30 +680,30 @@ export default function HomePage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-6 py-4">
-             <div className="p-4 bg-primary/5 rounded-xl border-2 border-primary/20 text-center">
-                <p className="text-[10px] font-black uppercase text-primary opacity-60">Winner Team</p>
-                <h3 className="text-2xl font-black uppercase">{winningTeam?.team === 'teamA' ? 'Team 1' : 'Team 2'}</h3>
-                <div className="mt-2 text-3xl font-black text-primary">{defaultWinningScore}</div>
-             </div>
+            <div className="p-4 bg-primary/5 rounded-xl border-2 border-primary/20 text-center">
+              <p className="text-[10px] font-black uppercase text-primary opacity-60">Winner Team</p>
+              <h3 className="text-2xl font-black uppercase">{winningTeam?.team === 'teamA' ? 'Team 1' : 'Team 2'}</h3>
+              <div className="mt-2 text-3xl font-black text-primary">{defaultWinningScore}</div>
+            </div>
 
-             <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase opacity-60">Losing Team's Score</Label>
-                <Input 
-                  ref={loserScoreInputRef}
-                  type="number" 
-                  min="0"
-                  placeholder="0" 
-                  value={loserScore === "0" ? "" : loserScore} 
-                  onChange={(e) => setLoserScore(e.target.value)}
-                  onBlur={(e) => { if (e.target.value === "") setLoserScore("0"); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleWinSubmit()}
-                  className="h-16 text-3xl font-black text-center border-2 no-spinner"
-                  autoFocus
-                />
-             </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase opacity-60">Losing Team's Score</Label>
+              <Input
+                ref={loserScoreInputRef}
+                type="number"
+                min="0"
+                placeholder="0"
+                value={loserScore === "0" ? "" : loserScore}
+                onChange={(e) => setLoserScore(e.target.value)}
+                onBlur={(e) => { if (e.target.value === "") setLoserScore("0"); }}
+                onKeyDown={(e) => e.key === 'Enter' && handleWinSubmit()}
+                className="h-16 text-3xl font-black text-center border-2 no-spinner"
+                autoFocus
+              />
+            </div>
           </div>
           <DialogFooter>
-             <Button className="w-full h-14 font-black uppercase" onClick={handleWinSubmit}>Confirm Result</Button>
+            <Button className="w-full h-14 font-black uppercase" onClick={handleWinSubmit}>Confirm Result</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -716,20 +717,20 @@ export default function HomePage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setPendingMatchFinish(null)} 
+            <Button
+              variant="outline"
+              onClick={() => setPendingMatchFinish(null)}
               className="font-black uppercase"
             >
               Edit Score
             </Button>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => {
                 if (pendingMatchFinish) {
                   completeMatch(
-                    pendingMatchFinish.courtId, 
-                    pendingMatchFinish.winner, 
-                    pendingMatchFinish.scoreA, 
+                    pendingMatchFinish.courtId,
+                    pendingMatchFinish.winner,
+                    pendingMatchFinish.scoreA,
                     pendingMatchFinish.scoreB
                   );
                 }

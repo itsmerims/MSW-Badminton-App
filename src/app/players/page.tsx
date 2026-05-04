@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from 'react';
-import { useClub } from '@/context/ClubContext';
+import { useSupabaseClub } from '@/context/SupabaseClubContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { SKILL_LEVELS_FULL, SKILL_LEVELS_SHORT, getSkillColor, Player } from '@/
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ListGetter } from '@/components/ingest/ListGetter';
 
 function StatusBadge({ status }: { status: string }) {
   const colors = {
@@ -30,7 +31,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PlayersPage() {
-  const { players, addPlayer, updatePlayer, deletePlayer } = useClub();
+  const { players, addPlayer, updatePlayer, deletePlayer } = useSupabaseClub();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +42,8 @@ export default function PlayersPage() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [editName, setEditName] = useState('');
   const [editSkill, setEditSkill] = useState('3');
+  const [inlineEditingId, setInlineEditingId] = useState<string | null>(null);
+  const [inlineEditSkill, setInlineEditSkill] = useState<number>(3);
 
   const filteredPlayers = useMemo(() => {
     return players.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -78,12 +81,18 @@ export default function PlayersPage() {
     toast({ title: "Profile Updated" });
   };
 
+  const handleInlineEditSave = (playerId: string) => {
+    updatePlayer(playerId, { skillLevel: inlineEditSkill });
+    setInlineEditingId(null);
+    toast({ title: "Skill Level Updated" });
+  };
+
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6 pb-24 max-w-7xl">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 max-w-7xl h-full overflow-auto">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
         <div className="space-y-0.5">
-          <h1 className="flex items-center gap-3">
-            <Users className="h-8 w-8 text-primary" /> Roster
+          <h1 className="flex items-center gap-2 md:gap-3">
+            <Users className="h-6 w-6 md:h-8 md:w-8 text-primary" /> Roster
           </h1>
           <p className="text-tiny text-muted-foreground font-black uppercase tracking-widest opacity-60">
             {players.length} Members
@@ -103,10 +112,11 @@ export default function PlayersPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <aside className="lg:col-span-4 space-y-6">
           <Card className="border-2 shadow-sm bg-card overflow-hidden">
-            <CardHeader className="p-4 bg-primary/5 border-b">
+            <CardHeader className="p-4 bg-primary/5 border-b flex items-center justify-between">
               <CardTitle className="text-tiny font-black uppercase tracking-widest flex items-center gap-2">
                 <Plus className="h-4 w-4" /> Quick Reg
               </CardTitle>
+              <ListGetter />
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="space-y-1.5">
@@ -187,15 +197,42 @@ export default function PlayersPage() {
                     <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-dashed min-w-0">
                       <div className="min-w-0 overflow-hidden">
                         <p className="text-[8px] font-black uppercase text-muted-foreground truncate mb-1">Skill</p>
-                        <Badge variant="outline" className={cn("text-[9px] font-black uppercase px-1.5 h-4 truncate w-full", getSkillColor(player.skillLevel))}>
-                          {SKILL_LEVELS_SHORT[player.skillLevel]}
-                        </Badge>
+                        {inlineEditingId === player.id ? (
+                          <Select value={inlineEditSkill.toString()} onValueChange={(v) => setInlineEditSkill(parseInt(v))}>
+                            <SelectTrigger className="h-6 text-[9px] font-bold border-2">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(SKILL_LEVELS_FULL).map(([val, label]) => (
+                                <SelectItem key={val} value={val} className="font-bold text-compact">{val} - {label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className={cn("text-[9px] font-black uppercase px-1.5 h-4 truncate w-full cursor-pointer hover:opacity-80", getSkillColor(player.skillLevel))}
+                            onClick={() => { setInlineEditingId(player.id); setInlineEditSkill(player.skillLevel); }}
+                          >
+                            {SKILL_LEVELS_SHORT[player.skillLevel]}
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-right min-w-0">
                         <p className="text-[8px] font-black uppercase text-muted-foreground truncate mb-1">Games</p>
                         <p className="text-compact font-black truncate">{player.gamesPlayed}</p>
                       </div>
                     </div>
+                    {inlineEditingId === player.id && (
+                      <div className="flex gap-1 pt-1">
+                        <Button size="sm" className="flex-1 h-6 text-[9px] font-bold" onClick={() => handleInlineEditSave(player.id)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 h-6 text-[9px] font-bold" onClick={() => setInlineEditingId(null)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               ))}

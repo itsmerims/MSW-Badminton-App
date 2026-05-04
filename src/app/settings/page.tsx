@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useClub } from '@/context/ClubContext';
+import { useSupabaseClub } from '@/context/SupabaseClubContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
 export default function SettingsPage() {
-  const { 
-    paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard, 
+  const {
+    paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
     autoAdvanceEnabled, setAutoAdvanceEnabled
-  } = useClub();
+  } = useSupabaseClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +32,7 @@ export default function SettingsPage() {
       const img = new (window as any).Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 400; 
+        const MAX_SIZE = 400;
         let width = img.width;
         let height = img.height;
 
@@ -52,7 +52,7 @@ export default function SettingsPage() {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        
+
         const compressedData = canvas.toDataURL('image/jpeg', 0.7);
         callback(compressedData);
       };
@@ -95,7 +95,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8 pb-24 max-w-5xl animate-in fade-in duration-500">
+    <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl h-full overflow-auto">
       <header className="space-y-1">
         <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
           <SettingsIcon className="h-8 w-8 text-primary" /> Settings
@@ -138,9 +138,9 @@ export default function SettingsPage() {
             <CardContent className="space-y-6">
               <div className="space-y-1.5">
                 <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Winning Score</Label>
-                <Input 
-                  type="number" 
-                  value={defaultWinningScore} 
+                <Input
+                  type="number"
+                  value={defaultWinningScore}
                   onChange={(e) => setDefaultWinningScore(parseInt(e.target.value) || 21)}
                   className="font-black text-lg h-12"
                 />
@@ -189,9 +189,9 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase opacity-60">Account Name</Label>
                 <div className="flex gap-2">
-                  <Input 
-                    placeholder="e.g. GCash" 
-                    value={newMethodName} 
+                  <Input
+                    placeholder="e.g. GCash"
+                    value={newMethodName}
                     onChange={e => setNewMethodName(e.target.value)}
                     className="font-bold text-xs"
                   />
@@ -205,9 +205,9 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-2 pt-2">
                 {paymentMethods.map(method => (
                   <div key={method.id} className="relative group border-2 rounded-xl p-2 bg-secondary/10 flex flex-col items-center">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="absolute top-1 right-1 h-5 w-5 hover:bg-destructive hover:text-white"
                       onClick={() => deletePaymentMethod(method.id)}
                     >
