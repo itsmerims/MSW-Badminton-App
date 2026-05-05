@@ -17,7 +17,7 @@ export default function SettingsPage() {
   const {
     paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
-    autoAdvanceEnabled, setAutoAdvanceEnabled
+    autoAdvanceEnabled, setAutoAdvanceEnabled, isPlayer, isAdmin
   } = useSupabaseClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
@@ -128,100 +128,110 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                <Trophy className="h-4 w-4" /> Gameplay Rules
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">Define scoring & match behavior.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Winning Score</Label>
-                <Input
-                  type="number"
-                  value={defaultWinningScore}
-                  onChange={(e) => setDefaultWinningScore(parseInt(e.target.value) || 21)}
-                  className="font-black text-lg h-12"
-                />
-                <p className="text-[9px] text-muted-foreground uppercase font-bold">This score is automatically applied when marking a winner.</p>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border-2 border-primary/20">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                    <Zap className="h-5 w-5 fill-primary" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-tight">Auto-Advance</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Next match pulls from queue</p>
-                  </div>
+          {!isPlayer && (
+            <Card className="border-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                  <Trophy className="h-4 w-4" /> Gameplay Rules
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase">Define scoring & match behavior.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Winning Score</Label>
+                  <Input
+                    type="number"
+                    value={defaultWinningScore}
+                    onChange={(e) => setDefaultWinningScore(parseInt(e.target.value) || 21)}
+                    className="font-black text-lg h-12"
+                  />
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold">This score is automatically applied when marking a winner.</p>
                 </div>
-                <Switch checked={autoAdvanceEnabled} onCheckedChange={setAutoAdvanceEnabled} />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
-                <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
-              </Button>
-              <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
-                <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
-              </Button>
-            </CardContent>
-          </Card>
+                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border-2 border-primary/20">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                      <Zap className="h-5 w-5 fill-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-black uppercase">Auto-Advance Matches</p>
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically move queue to next court</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={autoAdvanceEnabled}
+                    onCheckedChange={setAutoAdvanceEnabled}
+                    className="data-[state=checked]:bg-primary"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {isAdmin && (
+            <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
+              <CardHeader>
+                <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                  <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
+                </Button>
+                <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
+                  <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
-          <Card className="border-2 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                <QrCode className="h-4 w-4" /> QR Payments
-              </CardTitle>
-              <CardDescription className="text-[10px] font-bold uppercase">Manage payment codes.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase opacity-60">Account Name</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="e.g. GCash"
-                    value={newMethodName}
-                    onChange={e => setNewMethodName(e.target.value)}
-                    className="font-bold text-xs"
-                  />
-                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                  <Button size="icon" onClick={triggerFileUpload} disabled={isUploading} className="shrink-0">
-                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                {paymentMethods.map(method => (
-                  <div key={method.id} className="relative group border-2 rounded-xl p-2 bg-secondary/10 flex flex-col items-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-1 right-1 h-5 w-5 hover:bg-destructive hover:text-white"
-                      onClick={() => deletePaymentMethod(method.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
+          {!isPlayer && (
+            <Card className="border-2 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                  <QrCode className="h-4 w-4" /> QR Payments
+                </CardTitle>
+                <CardDescription className="text-[10px] font-bold uppercase">Manage payment codes.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase opacity-60">Account Name</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g. GCash"
+                      value={newMethodName}
+                      onChange={e => setNewMethodName(e.target.value)}
+                      className="font-bold text-xs"
+                    />
+                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                    <Button size="icon" onClick={triggerFileUpload} disabled={isUploading} className="shrink-0">
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     </Button>
-                    <div className="relative h-20 w-full border bg-white rounded-lg overflow-hidden mb-1 shadow-inner">
-                      <Image src={method.imageUrl} alt={method.name} fill className="object-contain p-1" />
-                    </div>
-                    <span className="font-black text-[9px] uppercase truncate w-full text-center">{method.name}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  {paymentMethods.map(method => (
+                    <div key={method.id} className="relative group border-2 rounded-xl p-2 bg-secondary/10 flex flex-col items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1 right-1 h-5 w-5 hover:bg-destructive hover:text-white"
+                        onClick={() => deletePaymentMethod(method.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                      <div className="relative h-20 w-full border bg-white rounded-lg overflow-hidden mb-1 shadow-inner">
+                        <Image src={method.imageUrl} alt={method.name} fill className="object-contain p-1" />
+                      </div>
+                      <span className="font-black text-[9px] uppercase truncate w-full text-center">{method.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

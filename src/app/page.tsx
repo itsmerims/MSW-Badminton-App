@@ -63,7 +63,8 @@ export default function HomePage() {
     players, matches, courts,
     deleteCourt, startMatch, startTimer,
     endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch,
-    updateMatchScore, addCourt, deleteMatch, defaultWinningScore
+    updateMatchScore, addCourt, deleteMatch, defaultWinningScore,
+    isAdmin, isQueueMaster, isPlayer
   } = useSupabaseClub();
   const { toast } = useToast();
 
@@ -141,6 +142,7 @@ export default function HomePage() {
   const onDropInQueue = (e: React.DragEvent) => {
     e.preventDefault();
     setIsQueueOver(false);
+    if (isPlayer) return; // Players cannot create matches
     const playerId = e.dataTransfer.getData("playerId");
     if (!playerId || allDraftedIds.includes(playerId)) return;
 
@@ -157,6 +159,7 @@ export default function HomePage() {
   const onDropInCourt = (e: React.DragEvent, courtId: string) => {
     e.preventDefault();
     setOverCourtId(null);
+    if (isPlayer) return; // Players cannot assign matches to courts
     const matchId = e.dataTransfer.getData("matchId");
     const playerId = e.dataTransfer.getData("playerId");
 
@@ -183,9 +186,23 @@ export default function HomePage() {
     }
   };
 
+  const handleDropInCourt = async (e: React.DragEvent, courtId: string) => {
+    e.preventDefault();
+    if (isPlayer) return; // Players cannot create courts or assign matches
+    const matchId = e.dataTransfer.getData("matchId");
+    const playerId = e.dataTransfer.getData("playerId");
+    if (matchId) { createCourtAndAssignMatch(matchId); return; }
+    if (playerId) {
+      if (allDraftedIds.includes(playerId)) return;
+      const newCourtId = await addCourt();
+      setCourtDrafts(prev => ({ ...prev, [newCourtId]: [playerId] }));
+    }
+  };
+
   const onDropInCourtPanel = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsCourtPanelOver(false);
+    if (isPlayer) return; // Players cannot create courts or assign matches
     const matchId = e.dataTransfer.getData("matchId");
     const playerId = e.dataTransfer.getData("playerId");
     if (matchId) { createCourtAndAssignMatch(matchId); return; }
@@ -198,11 +215,13 @@ export default function HomePage() {
 
   const handleSwap = (newPlayerId: string) => {
     if (!swapping) return;
+    if (isPlayer) return; // Players cannot swap players
     swapPlayer(swapping.matchId, swapping.oldPlayerId, newPlayerId);
     setSwapping(null);
   };
 
   const handleScoreChange = (matchId: string, scoreA: number, scoreB: number) => {
+    if (isPlayer) return; // Players cannot update scores
     updateMatchScore(matchId, Math.max(0, scoreA), Math.max(0, scoreB));
   };
 
@@ -289,55 +308,57 @@ export default function HomePage() {
     <div className="flex flex-col h-full bg-background overflow-hidden">
       <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-12">
 
-        {/* THE BENCH */}
-        <div className="md:col-span-3 border-r flex flex-col bg-secondary/5 min-h-0">
-          <div className="p-3 bg-card border-b flex items-center justify-between sticky top-0 z-10 gap-2 h-14">
-            <h2 className="text-tiny font-black uppercase tracking-widest flex items-center gap-2 shrink-0">
-              <User className="h-4 w-4 text-primary" /> The Bench
-            </h2>
-            <div className="flex items-center gap-1.5 overflow-hidden">
-              <Select value={sortOption} onValueChange={setSortOption}>
-                <SelectTrigger className="h-7 text-[9px] font-black uppercase tracking-widest border-2 w-[100px] bg-background px-2">
-                  <SelectValue placeholder="Sort" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default" className="text-[9px] font-bold uppercase">Default</SelectItem>
-                  <SelectItem value="skill-asc" className="text-[9px] font-bold uppercase">Skill ↑</SelectItem>
-                  <SelectItem value="skill-desc" className="text-[9px] font-bold uppercase">Skill ↓</SelectItem>
-                  <SelectItem value="name-asc" className="text-[9px] font-bold uppercase">A-Z</SelectItem>
-                  <SelectItem value="name-desc" className="text-[9px] font-bold uppercase">Z-A</SelectItem>
-                </SelectContent>
-              </Select>
-              <Badge variant="outline" className="font-black h-7 px-2 text-tiny shrink-0">{sortedAvailablePlayers.length}</Badge>
+        {/* THE BENCH - Hide for player role */}
+        {!isPlayer && (
+          <div className="md:col-span-3 border-r flex flex-col bg-secondary/5 min-h-0">
+            <div className="p-3 bg-card border-b flex items-center justify-between sticky top-0 z-10 gap-2 h-14">
+              <h2 className="text-tiny font-black uppercase tracking-widest flex items-center gap-2 shrink-0">
+                <User className="h-4 w-4 text-primary" /> The Bench
+              </h2>
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                <Select value={sortOption} onValueChange={setSortOption}>
+                  <SelectTrigger className="h-7 text-[9px] font-black uppercase tracking-widest border-2 w-[100px] bg-background px-2">
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default" className="text-[9px] font-bold uppercase">Default</SelectItem>
+                    <SelectItem value="skill-asc" className="text-[9px] font-bold uppercase">Skill ↑</SelectItem>
+                    <SelectItem value="skill-desc" className="text-[9px] font-bold uppercase">Skill ↓</SelectItem>
+                    <SelectItem value="name-asc" className="text-[9px] font-bold uppercase">A-Z</SelectItem>
+                    <SelectItem value="name-desc" className="text-[9px] font-bold uppercase">Z-A</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Badge variant="outline" className="font-black h-7 px-2 text-tiny shrink-0">{sortedAvailablePlayers.length}</Badge>
+              </div>
             </div>
+            <ScrollArea className="flex-1">
+              <div className="p-2 grid grid-cols-2 gap-2 pb-24">
+                {sortedAvailablePlayers.map((player) => (
+                  <Card
+                    key={player.id}
+                    draggable
+                    onDragStart={(e) => onDragStartPlayer(e, player.id)}
+                    className="p-3 cursor-grab active:cursor-grabbing hover:border-primary transition-all border-2 shadow-sm group bg-card min-w-0"
+                  >
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <span className="font-black text-compact truncate flex-1 leading-tight">{player.name}</span>
+                      <WaitTimeBadge lastAvailableAt={player.lastAvailableAt} />
+                    </div>
+                    <div className="flex justify-between items-center opacity-80 gap-1">
+                      <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-4 px-1.5 truncate", getSkillColor(player.skillLevel))}>
+                        {SKILL_LEVELS_SHORT[player.skillLevel]}
+                      </Badge>
+                      <span className="text-[10px] font-black shrink-0">{player.gamesPlayed} G</span>
+                    </div>
+                  </Card>
+                ))}
+                {sortedAvailablePlayers.length === 0 && (
+                  <div className="col-span-2 py-20 text-center text-muted-foreground font-bold italic opacity-20 text-compact">Bench Empty</div>
+                )}
+              </div>
+            </ScrollArea>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="p-2 grid grid-cols-2 gap-2 pb-24">
-              {sortedAvailablePlayers.map((player) => (
-                <Card
-                  key={player.id}
-                  draggable
-                  onDragStart={(e) => onDragStartPlayer(e, player.id)}
-                  className="p-3 cursor-grab active:cursor-grabbing hover:border-primary transition-all border-2 shadow-sm group bg-card min-w-0"
-                >
-                  <div className="flex items-center justify-between mb-1.5 gap-2">
-                    <span className="font-black text-compact truncate flex-1 leading-tight">{player.name}</span>
-                    <WaitTimeBadge lastAvailableAt={player.lastAvailableAt} />
-                  </div>
-                  <div className="flex justify-between items-center opacity-80 gap-1">
-                    <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-4 px-1.5 truncate", getSkillColor(player.skillLevel))}>
-                      {SKILL_LEVELS_SHORT[player.skillLevel]}
-                    </Badge>
-                    <span className="text-[10px] font-black shrink-0">{player.gamesPlayed} G</span>
-                  </div>
-                </Card>
-              ))}
-              {sortedAvailablePlayers.length === 0 && (
-                <div className="col-span-2 py-20 text-center text-muted-foreground font-bold italic opacity-20 text-compact">Bench Empty</div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
+        )}
 
         {/* MATCH QUEUE */}
         <div
@@ -389,14 +410,16 @@ export default function HomePage() {
                       #{index + 1}
                     </Badge>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive hover:text-white z-10"
-                    onClick={() => handleDeleteMatch(match.id)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive hover:text-white z-10"
+                      onClick={() => handleDeleteMatch(match.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <div className="p-3 pt-6 flex items-center justify-between gap-2">
                     <div className="flex flex-col space-y-1.5 flex-1 min-w-0 border-l-4 border-primary/20 pl-2">
                       <span className="text-[8px] font-black uppercase text-primary opacity-50">T1</span>
@@ -638,9 +661,11 @@ export default function HomePage() {
                       ) : (
                         <div className="flex w-full justify-between items-center px-1 h-10">
                           <p className="text-[9px] font-black uppercase opacity-40 truncate">READY</p>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-white shrink-0" onClick={() => deleteCourt(court.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-white shrink-0" onClick={() => deleteCourt(court.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </CardFooter>

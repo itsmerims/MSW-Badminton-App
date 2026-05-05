@@ -1,10 +1,12 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { Player, Court, Match, Fee, PaymentMethod, MatchStatus, PlayerSnapshot, Session, SessionParticipation } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+import { Player, Court, Match, Fee, PaymentMethod, Session, SessionParticipation } from '@/lib/types'
+import { generateId } from '@/lib/utils'
 import { SplashScreen } from '@/components/layout/SplashScreen'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { RoleSelector, UserRole } from '@/components/role/RoleSelector'
 
 interface ClubContextType {
   players: Player[]
@@ -16,6 +18,11 @@ interface ClubContextType {
   sessionParticipations: SessionParticipation[]
   defaultWinningScore: number
   autoAdvanceEnabled: boolean
+  userRole: UserRole | null
+  setUserRole: (role: UserRole | null) => void
+  isAdmin: boolean
+  isQueueMaster: boolean
+  isPlayer: boolean
   addPlayer: (player: Omit<Player, 'id' | 'wins' | 'gamesPlayed' | 'partnerHistory' | 'status' | 'improvementScore' | 'totalPlayTimeMinutes' | 'lastAvailableAt'>) => Promise<void>
   updatePlayer: (id: string, updates: Partial<Player>) => Promise<void>
   deletePlayer: (id: string) => Promise<void>
@@ -55,6 +62,16 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
   const [defaultWinningScore, setDefaultWinningScoreState] = useState<number>(21)
   const [autoAdvanceEnabled, setAutoAdvanceEnabledState] = useState<boolean>(true)
   const [isLoaded, setIsLoaded] = useState(false)
+  const [userRole, setUserRole] = useState<UserRole | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('userRole') as UserRole | null
+    }
+    return null
+  })
+
+  const isAdmin = userRole === 'admin'
+  const isQueueMaster = userRole === 'queue_master' || userRole === 'admin'
+  const isPlayer = userRole === 'player'
   const supabase = createClient()
 
   useEffect(() => {
@@ -171,7 +188,43 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
-      .channel('queue-changes')
+      .channel('all-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'players'
+        },
+        (payload) => {
+          console.log('Players change:', payload)
+          loadData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'courts'
+        },
+        (payload) => {
+          console.log('Courts change:', payload)
+          loadData()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'matches'
+        },
+        (payload) => {
+          console.log('Matches change:', payload)
+          loadData()
+        }
+      )
       .on(
         'postgres_changes',
         {
@@ -875,6 +928,7 @@ export function SupabaseClubProvider({ children }: { children: ReactNode }) {
   return (
     <ClubContext.Provider value={{
       players, courts, matches, fees, paymentMethods, sessions, sessionParticipations, defaultWinningScore, autoAdvanceEnabled,
+      userRole, setUserRole, isAdmin, isQueueMaster, isPlayer,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
       addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,

@@ -31,7 +31,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PlayersPage() {
-  const { players, addPlayer, updatePlayer, deletePlayer } = useSupabaseClub();
+  const { players, addPlayer, updatePlayer, deletePlayer, isPlayer } = useSupabaseClub();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -110,44 +110,46 @@ export default function PlayersPage() {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <aside className="lg:col-span-4 space-y-6">
-          <Card className="border-2 shadow-sm bg-card overflow-hidden">
-            <CardHeader className="p-4 bg-primary/5 border-b flex items-center justify-between">
-              <CardTitle className="text-tiny font-black uppercase tracking-widest flex items-center gap-2">
-                <Plus className="h-4 w-4" /> Quick Reg
-              </CardTitle>
-              <ListGetter />
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Full Name</Label>
-                <Input
-                  ref={inputRef}
-                  placeholder="Press Enter to submit name..."
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-10 text-compact font-bold border-2"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Skill Tier</Label>
-                <Select value={newSkill} onValueChange={setNewSkill}>
-                  <SelectTrigger className="h-10 text-compact font-bold border-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(SKILL_LEVELS_FULL).map(([val, label]) => (
-                      <SelectItem key={val} value={val} className="font-bold text-compact">{val} - {label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full font-black uppercase text-compact h-12" onClick={handleAddPlayerAction} disabled={!newName.trim()}>
-                Add Member
-              </Button>
-            </CardContent>
-          </Card>
+        <aside className={cn("lg:col-span-4 space-y-6", isPlayer ? "hidden" : "")}>
+          {!isPlayer && (
+            <Card className="border-2 shadow-sm bg-card overflow-hidden">
+              <CardHeader className="p-4 bg-primary/5 border-b flex items-center justify-between">
+                <CardTitle className="text-tiny font-black uppercase tracking-widest flex items-center gap-2">
+                  <Plus className="h-4 w-4" /> Quick Reg
+                </CardTitle>
+                <ListGetter />
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Full Name</Label>
+                  <Input
+                    ref={inputRef}
+                    placeholder="Press Enter to submit name..."
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="h-10 text-compact font-bold border-2"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Skill Tier</Label>
+                  <Select value={newSkill} onValueChange={setNewSkill}>
+                    <SelectTrigger className="h-10 text-compact font-bold border-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SKILL_LEVELS_FULL).map(([val, label]) => (
+                        <SelectItem key={val} value={val} className="font-bold text-compact">{val} - {label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button className="w-full font-black uppercase text-compact h-12" onClick={handleAddPlayerAction} disabled={!newName.trim()}>
+                  Add Member
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-2 shadow-sm hidden md:block">
             <CardHeader className="p-4 border-b">
@@ -170,7 +172,7 @@ export default function PlayersPage() {
           </Card>
         </aside>
 
-        <div className="lg:col-span-8">
+        <div className={cn("lg:col-span-8", isPlayer ? "lg:col-span-12" : "")}>
           <ScrollArea className="h-[calc(100vh-220px)]">
             <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2 pr-2 pb-24">
               {filteredPlayers.map((player) => (

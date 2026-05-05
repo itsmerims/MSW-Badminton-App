@@ -20,7 +20,7 @@ import { getSkillColor, SKILL_LEVELS_SHORT, Player, Court } from '@/lib/types';
 
 export function Header() {
   const pathname = usePathname();
-  const { courts, players, addCourt, startMatch } = useSupabaseClub();
+  const { courts, players, addCourt, startMatch, isPlayer, isAdmin } = useSupabaseClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
 
@@ -115,98 +115,106 @@ export function Header() {
             {theme === 'dark' ? <Sun className="h-4 w-4 md:h-5 md:w-5" /> : <Moon className="h-4 w-4 md:h-5 md:w-5" />}
           </Button>
 
-          {/* Mobile: Icon-only buttons */}
-          <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="md:hidden h-9 w-9 p-0 border-2 hover:bg-secondary">
-                <Swords className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle className="text-lg font-black uppercase">Manual Match Selection</DialogTitle></DialogHeader>
-              <div className="space-y-6 py-6">
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest">Target Court</Label>
-                  <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
-                    <SelectTrigger className="h-12 font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="queue" className="font-bold">Send to Queue</SelectItem>
-                      {courts.filter(c => c.status === 'available').map(c => (
-                        <SelectItem key={c.id} value={c.id} className="font-bold">{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {!isPlayer && (
+            <Button onClick={handleQuickMatch} className="md:hidden h-9 w-9 p-0 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+              <Zap className="h-4 w-4 fill-white" />
+            </Button>
+          )}
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest">Select 4 Players ({selectedPlayerIds.length}/4)</Label>
-                  <ScrollArea className="h-80 border-2 rounded-xl p-3">
-                    <div className="space-y-2">
-                      {players.filter(p => p.status === 'available').map(player => (
-                        <div key={player.id} className="flex items-center space-x-3 p-3 hover:bg-secondary rounded-xl transition-colors">
-                          <Checkbox
-                            id={player.id}
-                            checked={selectedPlayerIds.includes(player.id)}
-                            className="h-6 w-6"
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                if (selectedPlayerIds.length < 4) setSelectedPlayerIds([...selectedPlayerIds, player.id]);
-                              } else {
-                                setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.id));
-                              }
-                            }}
-                          />
-                          <label htmlFor={player.id} className="text-sm font-black cursor-pointer flex-1 flex items-center justify-between">
-                            <span>{player.name}</span>
-                            <Badge variant="outline" className={cn("text-[10px] font-black uppercase px-2 h-5", getSkillColor(player.skillLevel))}>
+          {!isPlayer && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 md:h-10 md:w-10 border-2 hover:bg-secondary"
+              onClick={() => {
+                addCourt();
+                toast({ title: "Court Added" });
+              }}
+            >
+              <Plus className="h-4 w-4 md:h-5 md:w-5" />
+            </Button>
+          )}
+
+          {!isPlayer && (
+            <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="md:hidden h-9 w-9 p-0 border-2 hover:bg-secondary">
+                  <Swords className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader><DialogTitle className="text-lg font-black uppercase">Manual Match Selection</DialogTitle></DialogHeader>
+                <div className="space-y-6 py-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest">Target Court</Label>
+                    <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+                      <SelectTrigger className="h-12 font-bold"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="queue" className="font-bold">Send to Queue</SelectItem>
+                        {courts.filter(c => c.status === 'available').map(c => (
+                          <SelectItem key={c.id} value={c.id} className="font-bold">{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-xs font-black uppercase tracking-widest">Select 4 Players</Label>
+                    <ScrollArea className="h-48 border rounded-lg p-2">
+                      <div className="space-y-2">
+                        {players.filter((p: Player) => p.status === 'available').map((player) => (
+                          <div key={player.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary/50">
+                            <Checkbox
+                              id={player.id}
+                              checked={selectedPlayerIds.includes(player.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  if (selectedPlayerIds.length < 4) setSelectedPlayerIds([...selectedPlayerIds, player.id]);
+                                } else {
+                                  setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.id));
+                                }
+                              }}
+                            />
+                            <label htmlFor={player.id} className="flex-1 text-xs font-bold truncate cursor-pointer">
+                              {player.name}
+                            </label>
+                            <Badge variant="outline" className={cn("text-[9px] h-4 px-1.5", getSkillColor(player.skillLevel))}>
                               {SKILL_LEVELS_SHORT[player.skillLevel]}
                             </Badge>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  <Button
+                    className="w-full font-black uppercase h-16 text-base shadow-xl shadow-primary/20"
+                    disabled={selectedPlayerIds.length !== 4}
+                    onClick={handleManualMatchSubmit}
+                  >
+                    Create Manual Match
+                  </Button>
                 </div>
+              </DialogContent>
+            </Dialog>
+          )}
 
-                <Button
-                  className="w-full font-black uppercase h-16 text-base shadow-xl shadow-primary/20"
-                  disabled={selectedPlayerIds.length !== 4}
-                  onClick={handleManualMatchSubmit}
-                >
-                  Create Manual Match
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Button onClick={handleQuickMatch} className="md:hidden h-9 w-9 p-0 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
-            <Zap className="h-4 w-4 fill-white" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 md:h-10 md:w-10 border-2 hover:bg-secondary"
-            onClick={() => {
-              addCourt();
-              toast({ title: "Court Added" });
-            }}
-          >
-            <Plus className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
+          {!isPlayer && (
+            <Button onClick={handleQuickMatch} className="hidden md:flex gap-2 bg-primary font-black uppercase text-[10px] tracking-widest h-10 px-4 shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+              <Zap className="h-4 w-4 fill-white" /> Quick
+            </Button>
+          )}
 
           {/* Desktop: Labeled buttons */}
-          <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="hidden md:flex gap-2 font-black uppercase text-[10px] tracking-widest h-10 border-2 hover:bg-secondary px-4">
-                <Swords className="h-4 w-4" /> Manual
-              </Button>
-            </DialogTrigger>
-          </Dialog>
-
-          <Button onClick={handleQuickMatch} className="hidden md:flex gap-2 bg-primary font-black uppercase text-[10px] tracking-widest h-10 px-4 shadow-lg shadow-primary/20 hover:scale-105 transition-all">
-            <Zap className="h-4 w-4 fill-white" /> Quick
-          </Button>
+          {!isPlayer && (
+            <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="hidden md:flex gap-2 font-black uppercase text-[10px] tracking-widest h-10 border-2 hover:bg-secondary px-4">
+                  <Swords className="h-4 w-4" /> Manual
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          )}
 
           {/* Mobile Hamburger Menu */}
           <Button
