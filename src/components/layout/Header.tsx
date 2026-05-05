@@ -70,7 +70,7 @@ export function Header() {
 
   return (
     <>
-      <header className="h-14 md:h-16 border-b bg-card flex items-center justify-between px-4 md:px-6 shrink-0 shadow-md z-50 transition-colors">
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative">
         <div className="flex items-center gap-4 md:gap-6">
           <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
             <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg border bg-primary text-primary-foreground shadow-sm">
@@ -222,7 +222,7 @@ export function Header() {
 
       {/* Mobile Navigation Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 z-[51] md:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="absolute right-0 top-0 bottom-0 w-64 bg-card shadow-xl animate-in slide-in-from-right">
             <nav className="flex flex-col p-4 space-y-2">
