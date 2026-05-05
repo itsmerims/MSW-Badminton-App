@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   title: 'MSW Badminton | Badminton Club',
   description: 'Badminton court queuing and matching for MSW Badminton.',
   icons: {
-    icon: '/favicon.svg',
+    icon: '/mswlogo.png',
   },
 };
 

@@ -12,19 +12,72 @@ interface MatchScoreDialogProps {
   teamB: Player[];
   onScoreSubmit: (teamAScore: number | undefined, teamBScore: number | undefined, winner: 'teamA' | 'teamB') => void;
   onSkip?: () => void;
+  defaultWinningScore?: number;
 }
 
-export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubmit, onSkip }: MatchScoreDialogProps) {
+export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubmit, onSkip, defaultWinningScore = 21 }: MatchScoreDialogProps) {
   const [teamAScore, setTeamAScore] = useState<string>('');
   const [teamBScore, setTeamBScore] = useState<string>('');
+  const [validationError, setValidationError] = useState<string>('');
+
+  const validateScores = (a: number, b: number): string | null => {
+    const winningScore = defaultWinningScore || 21;
+
+    // Check for negative scores (shouldn't happen due to Math.max, but double-check)
+    if (a < 0 || b < 0) {
+      return 'Scores cannot be negative';
+    }
+
+    // Check if both scores are zero
+    if (a === 0 && b === 0) {
+      return 'At least one team must have a score';
+    }
+
+    // Determine potential winner
+    const winnerScore = Math.max(a, b);
+    const loserScore = Math.min(a, b);
+
+    // Winner must reach at least the winning score
+    if (winnerScore < winningScore) {
+      return `Winner must reach at least ${winningScore} points`;
+    }
+
+    // If both scores reach winning score (deuce), winner must win by 2
+    if (loserScore >= winningScore && (winnerScore - loserScore) < 2) {
+      return `At deuce (both at ${winningScore}+), winner must lead by 2 points`;
+    }
+
+    // Loser cannot have more points than winner
+    if (loserScore > winnerScore) {
+      return 'Invalid score: loser has more points than winner';
+    }
+
+    // Reasonable maximum score check (badminton typically ends by 30)
+    if (winnerScore > 30) {
+      return 'Score exceeds reasonable maximum (30 points)';
+    }
+
+    return null;
+  };
 
   const handleSubmit = () => {
     const aVal = teamAScore.trim() === '' ? undefined : Math.max(0, Number(teamAScore));
     const bVal = teamBScore.trim() === '' ? undefined : Math.max(0, Number(teamBScore));
-    
+
+    if (aVal === undefined || bVal === undefined) {
+      setValidationError('Both scores are required');
+      return;
+    }
+
+    const error = validateScores(aVal, bVal);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
     // Auto-determine winner if scores are provided
-    const winner = (aVal ?? 0) >= (bVal ?? 0) ? 'teamA' : 'teamB';
-    
+    const winner = aVal >= bVal ? 'teamA' : 'teamB';
+
     onScoreSubmit(aVal, bVal, winner);
     reset();
   };
@@ -38,6 +91,7 @@ export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubm
   const reset = () => {
     setTeamAScore('');
     setTeamBScore('');
+    setValidationError('');
   };
 
   return (
@@ -58,7 +112,10 @@ export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubm
               <Input
                 placeholder="0"
                 value={teamAScore}
-                onChange={e => setTeamAScore(e.target.value)}
+                onChange={e => {
+                  setTeamAScore(e.target.value);
+                  setValidationError('');
+                }}
                 type="number"
                 min="0"
                 className="text-center text-4xl font-black h-20 border-2 no-spinner"
@@ -78,7 +135,10 @@ export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubm
               <Input
                 placeholder="0"
                 value={teamBScore}
-                onChange={e => setTeamBScore(e.target.value)}
+                onChange={e => {
+                  setTeamBScore(e.target.value);
+                  setValidationError('');
+                }}
                 type="number"
                 min="0"
                 className="text-center text-4xl font-black h-20 border-2 no-spinner"
@@ -89,17 +149,23 @@ export function MatchScoreDialog({ open, onOpenChange, teamA, teamB, onScoreSubm
             </div>
           </div>
 
+          {validationError && (
+            <div className="bg-destructive/10 border-2 border-destructive/20 text-destructive text-xs font-bold uppercase px-4 py-3 rounded-lg">
+              {validationError}
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 pt-6">
-            <Button 
-              className="w-full font-black h-16 text-lg uppercase" 
+            <Button
+              className="w-full font-black h-16 text-lg uppercase"
               onClick={handleSubmit}
               disabled={teamAScore === '' || teamBScore === ''}
             >
               Submit Results
             </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full text-xs font-black uppercase tracking-widest text-muted-foreground" 
+            <Button
+              variant="ghost"
+              className="w-full text-xs font-black uppercase tracking-widest text-muted-foreground"
               onClick={handleSkip}
             >
               Skip & Pick Winner Manually

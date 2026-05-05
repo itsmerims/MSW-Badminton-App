@@ -234,20 +234,34 @@ export default function HomePage() {
     const higher = Math.max(scoreA, scoreB);
     const lower = Math.min(scoreA, scoreB);
 
-    if (higher < defaultWinningScore) {
-      return { valid: false, message: `Winning score (${defaultWinningScore}) not reached.` };
+    // Check for negative scores
+    if (scoreA < 0 || scoreB < 0) {
+      return { valid: false, message: "Scores cannot be negative." };
     }
 
-    if (higher === scoreB && scoreA === scoreB) {
+    // Check if both scores are zero
+    if (scoreA === 0 && scoreB === 0) {
+      return { valid: false, message: "At least one team must have a score." };
+    }
+
+    // Winner must reach at least the winning score
+    if (higher < defaultWinningScore) {
+      return { valid: false, message: `Winner must reach at least ${defaultWinningScore} points.` };
+    }
+
+    // Scores cannot be equal
+    if (scoreA === scoreB) {
       return { valid: false, message: "Scores cannot be equal." };
     }
 
-    if (higher === defaultWinningScore && lower === defaultWinningScore - 1) {
-      return { valid: false, message: `Must win by 2 points (e.g., ${defaultWinningScore + 1}-${defaultWinningScore - 1}).` };
+    // If both scores reach winning score (deuce), winner must win by 2
+    if (lower >= defaultWinningScore && (higher - lower) < 2) {
+      return { valid: false, message: `At deuce (both at ${defaultWinningScore}+), winner must lead by 2 points.` };
     }
 
-    if (higher > defaultWinningScore && (higher - lower) < 2) {
-      return { valid: false, message: "Must win by 2 points in deuce." };
+    // Reasonable maximum score check (badminton typically ends by 30)
+    if (higher > 30) {
+      return { valid: false, message: "Score exceeds reasonable maximum (30 points)." };
     }
 
     return { valid: true };

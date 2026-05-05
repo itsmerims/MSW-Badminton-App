@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Player, Court, Match } from '@/lib/types';
 
 export default function CourtsPage() {
-  const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch } = useSupabaseClub();
+  const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch, defaultWinningScore } = useSupabaseClub();
   const { toast } = useToast();
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [newCourtName, setNewCourtName] = useState('');
@@ -196,6 +196,7 @@ export default function CourtsPage() {
             teamA={teamA}
             teamB={teamB}
             onScoreSubmit={handleScoreSubmit}
+            defaultWinningScore={defaultWinningScore}
           />
         );
       })()}
