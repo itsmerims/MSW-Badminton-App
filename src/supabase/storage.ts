@@ -3,6 +3,46 @@ import { supabase } from './client';
 const QR_CODE_BUCKET = 'msw-badminton';
 
 /**
+ * Checks if a bucket exists in Supabase storage.
+ */
+const checkBucketExists = async (bucketName: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.storage.listBuckets();
+    if (error) {
+      console.error('[checkBucketExists] Error listing buckets:', error);
+      return false;
+    }
+    const exists = data?.some(bucket => bucket.name === bucketName) ?? false;
+    console.log('[checkBucketExists] Bucket', bucketName, 'exists:', exists);
+    return exists;
+  } catch (error) {
+    console.error('[checkBucketExists] Unexpected error:', error);
+    return false;
+  }
+};
+
+/**
+ * Creates a bucket in Supabase storage if it doesn't exist.
+ */
+const ensureBucketExists = async (bucketName: string): Promise<boolean> => {
+  const exists = await checkBucketExists(bucketName);
+  if (exists) return true;
+
+  console.log('[ensureBucketExists] Creating bucket:', bucketName);
+  const { data, error } = await supabase.storage.createBucket(bucketName, {
+    public: true,
+  });
+
+  if (error) {
+    console.error('[ensureBucketExists] Failed to create bucket:', error);
+    return false;
+  }
+
+  console.log('[ensureBucketExists] Bucket created successfully');
+  return true;
+};
+
+/**
  * Uploads a file to a specified Supabase storage bucket.
  *
  * @param bucketName The name of the Supabase storage bucket.
@@ -16,6 +56,18 @@ export const uploadFileToSupabase = async (
   path: string,
   file: File
 ) => {
+  console.log('[uploadFileToSupabase] Uploading to bucket:', bucketName);
+  console.log('[uploadFileToSupabase] Path:', path);
+  console.log('[uploadFileToSupabase] File:', file.name, file.size, file.type);
+
+  // Ensure bucket exists and is public
+  const bucketReady = await ensureBucketExists(bucketName);
+  if (!bucketReady) {
+    const errorMsg = `Failed to ensure bucket '${bucketName}' exists. Please create it manually in your Supabase dashboard and make it public.`;
+    console.error('[uploadFileToSupabase]', errorMsg);
+    throw new Error(errorMsg);
+  }
+
   const { data, error } = await supabase.storage
     .from(bucketName)
     .upload(path, file, {
@@ -24,9 +76,12 @@ export const uploadFileToSupabase = async (
     });
 
   if (error) {
-    console.error('Supabase upload error:', error);
-    throw new Error(`Failed to upload file: ${error.message}`);
+    console.error('[uploadFileToSupabase] Supabase upload error:', error);
+    console.error('[uploadFileToSupabase] Error details:', JSON.stringify(error, null, 2));
+    throw new Error(`Failed to upload file: ${error.message}. Check if bucket '${bucketName}' is public and RLS policies allow uploads.`);
   }
+
+  console.log('[uploadFileToSupabase] Upload successful, data:', data);
 
   // Retrieve the public URL of the uploaded file
   const { data: urlData } = supabase.storage
@@ -37,6 +92,7 @@ export const uploadFileToSupabase = async (
     throw new Error('Failed to get public URL for the uploaded file.');
   }
 
+  console.log('[uploadFileToSupabase] Public URL:', urlData.publicUrl);
   return urlData.publicUrl;
 };
 
@@ -51,18 +107,29 @@ export const uploadQRCodeToSupabase = async (
   paymentMethodId: string,
   imageData: string | File
 ): Promise<string> => {
+  console.log('[uploadQRCodeToSupabase] Starting upload for:', paymentMethodId);
+
   let file: File;
 
   if (typeof imageData === 'string') {
     // Convert base64 to File
-    const response = await fetch(imageData);
-    const blob = await response.blob();
-    file = new File([blob], `qr-${paymentMethodId}.png`, { type: 'image/png' });
+    console.log('[uploadQRCodeToSupabase] Converting base64 to File...');
+    try {
+      const response = await fetch(imageData);
+      const blob = await response.blob();
+      file = new File([blob], `qr-${paymentMethodId}.png`, { type: 'image/png' });
+      console.log('[uploadQRCodeToSupabase] File created:', file.name, file.size, file.type);
+    } catch (error) {
+      console.error('[uploadQRCodeToSupabase] Failed to convert base64 to File:', error);
+      throw new Error(`Failed to convert base64 to File: ${error}`);
+    }
   } else {
     file = imageData;
+    console.log('[uploadQRCodeToSupabase] Using provided file:', file.name, file.size, file.type);
   }
 
   const path = `payment-methods/${paymentMethodId}.png`;
+  console.log('[uploadQRCodeToSupabase] Uploading to bucket:', QR_CODE_BUCKET, 'path:', path);
   return uploadFileToSupabase(QR_CODE_BUCKET, path, file);
 };
 
