@@ -33,6 +33,7 @@ interface ClubContextType {
   togglePayment: (date: string, playerId: string) => void;
   addPaymentMethod: (name: string, imageData: string) => Promise<void>;
   deletePaymentMethod: (id: string) => Promise<void>;
+  refreshPaymentMethodsFromSupabase: () => Promise<void>;
   setDefaultWinningScore: (score: number) => void;
   setAutoAdvanceEnabled: (enabled: boolean) => void;
   resetDailyBoard: () => void;
@@ -650,6 +651,17 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setPaymentMethods(prev => prev.filter(pm => pm.id !== id));
   };
 
+  const refreshPaymentMethodsFromSupabase = async () => {
+    try {
+      const { listQRCodesFromSupabase } = await import('@/supabase/storage');
+      const supabasePaymentMethods = await listQRCodesFromSupabase();
+      setPaymentMethods(supabasePaymentMethods);
+      localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(supabasePaymentMethods));
+    } catch (error) {
+      console.error('Failed to refresh payment methods from Supabase:', error);
+    }
+  };
+
   const setDefaultWinningScore = (score: number) => {
     setDefaultWinningScoreState(score);
   };
@@ -834,7 +846,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isPlayer: false,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
-      addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
+      addPaymentMethod, deletePaymentMethod, refreshPaymentMethodsFromSupabase, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
       createSession, endSession, getSession, getCurrentSession, registerPlayerForSession, ingestPlayersFromList,
       getPlayerCountForSession: (sessionId: string) => players.filter(p => p.sessionId === sessionId).length,
     }}>

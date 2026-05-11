@@ -149,3 +149,44 @@ export const deleteQRCodeFromSupabase = async (paymentMethodId: string): Promise
     throw new Error(`Failed to delete file: ${error.message}`);
   }
 };
+
+/**
+ * Lists all QR code images from Supabase storage.
+ *
+ * @returns Array of payment method objects with id, name, and imageUrl.
+ */
+export const listQRCodesFromSupabase = async (): Promise<{ id: string; name: string; imageUrl: string }[]> => {
+  console.log('[listQRCodesFromSupabase] Listing QR codes from bucket:', QR_CODE_BUCKET);
+
+  const { data, error } = await supabase.storage
+    .from(QR_CODE_BUCKET)
+    .list('payment-methods');
+
+  if (error) {
+    console.error('[listQRCodesFromSupabase] Error listing files:', error);
+    throw new Error(`Failed to list QR codes: ${error.message}`);
+  }
+
+  console.log('[listQRCodesFromSupabase] Files found:', data?.length);
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  const paymentMethods = data.map(file => {
+    // Extract payment method ID from filename (remove .png extension)
+    const id = file.name.replace('.png', '');
+    const { data: urlData } = supabase.storage
+      .from(QR_CODE_BUCKET)
+      .getPublicUrl(`payment-methods/${file.name}`);
+
+    return {
+      id,
+      name: id, // Use ID as name for now, can be enhanced later
+      imageUrl: urlData.publicUrl
+    };
+  });
+
+  console.log('[listQRCodesFromSupabase] Payment methods:', paymentMethods);
+  return paymentMethods;
+};

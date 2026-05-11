@@ -51,8 +51,9 @@ function QRImage({ src, alt, className }: { src: string; alt: string; className?
 }
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer, refreshPaymentMethodsFromSupabase } = useClub();
   const [today, setToday] = useState<string>('');
+  const [isRefreshingQR, setIsRefreshingQR] = useState(false);
 
   const [shuttleUnits, setShuttleUnits] = useState(0);
   const [shuttleCostPerUnit, setShuttleCostPerUnit] = useState(0);
@@ -103,6 +104,12 @@ export default function FeesPage() {
       return aPaid === bPaid ? 0 : aPaid ? 1 : -1;
     });
   }, [players, currentFee]);
+
+  const handleQRMethodsClick = async () => {
+    setIsRefreshingQR(true);
+    await refreshPaymentMethodsFromSupabase();
+    setIsRefreshingQR(false);
+  };
 
   return (
     <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl h-full overflow-auto">
@@ -309,23 +316,34 @@ export default function FeesPage() {
               <div className="flex gap-2">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 font-black uppercase text-[10px] border-2">
+                    <Button variant="outline" size="sm" className="gap-2 font-black uppercase text-[10px] border-2" onClick={handleQRMethodsClick}>
                       <QrCode className="h-4 w-4" /> QR Methods
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl">
-                    <DialogHeader><DialogTitle>Scan to Pay</DialogTitle></DialogHeader>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-                      {paymentMethods.map(method => (
-                        <Card key={method.id} className="overflow-hidden border-2">
-                          <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
-                          <div className="h-64 bg-white flex items-center justify-center p-4">
-                            <QRImage src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
-                          </div>
-                          <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{perPlayerFee}</div>
-                        </Card>
-                      ))}
-                    </div>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        Scan to Pay
+                        {isRefreshingQR && <Loader2 className="h-4 w-4 animate-spin" />}
+                      </DialogTitle>
+                    </DialogHeader>
+                    {isRefreshingQR ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+                        {paymentMethods.map(method => (
+                          <Card key={method.id} className="overflow-hidden border-2">
+                            <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
+                            <div className="h-64 bg-white flex items-center justify-center p-4">
+                              <QRImage src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
+                            </div>
+                            <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{perPlayerFee}</div>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
                   </DialogContent>
                 </Dialog>
               </div>
