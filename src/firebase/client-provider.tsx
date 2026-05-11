@@ -15,12 +15,9 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
-    // Automatically sign in anonymously to satisfy standard Firebase patterns
-    // and provide a silent "admin" context for this local-only app.
-    if (firebaseServices.auth) {
-      initiateAnonymousSignIn(firebaseServices.auth);
-    }
-  }, [firebaseServices.auth]);
+    // Note: Anonymous sign-in disabled - this is a local-first app using localStorage
+    // Firebase is only used for Firestore operations if needed
+  }, []);
 
   return (
     <FirebaseProvider
