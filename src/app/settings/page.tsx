@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ export default function SettingsPage() {
     paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
     autoAdvanceEnabled, setAutoAdvanceEnabled, isPlayer, isAdmin
-  } = useSupabaseClub();
+  } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);

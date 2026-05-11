@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from 'react';
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PlayersPage() {
-  const { players, addPlayer, updatePlayer, deletePlayer, isPlayer } = useSupabaseClub();
+  const { players, addPlayer, updatePlayer, deletePlayer, isPlayer } = useClub();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 

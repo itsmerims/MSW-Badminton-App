@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { Player, Court, Match } from '@/lib/types';
 
 export default function CourtsPage() {
-  const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch, defaultWinningScore } = useSupabaseClub();
+  const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch, defaultWinningScore } = useClub();
   const { toast } = useToast();
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [newCourtName, setNewCourtName] = useState('');

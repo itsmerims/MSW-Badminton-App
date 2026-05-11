@@ -1,9 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "studio-8289009920-31c2b",
-  "appId": "1:380629825062:web:e595813b55ac4626ddd8e7",
-  "apiKey": "AIzaSyAKGYRP8SjvCq-hT2w5yNDIJEOhjaJGvw8",
-  "authDomain": "studio-8289009920-31c2b.firebaseapp.com",
-  "storageBucket": "studio-8289009920-31c2b.firebasestorage.app",
-  "measurementId": "",
-  "messagingSenderId": "380629825062"
+  apiKey: "AIzaSyAhuuzNgJqAiGbWkQFmGPHaGCA_pgieX20",
+  authDomain: "msw-badminton.firebaseapp.com",
+  projectId: "msw-badminton",
+  storageBucket: "msw-badminton.appspot.com",
+  messagingSenderId: "833949817426",
+  appId: "1:833949817426:web:7bea3abacf0bf65ca85d8b",
+  measurementId: "G-H64SB2DLMM"
 };

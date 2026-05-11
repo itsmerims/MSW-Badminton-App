@@ -1,6 +1,6 @@
 "use client";
 
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trophy, TrendingUp, Medal, Star, Target, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { useMemo } from 'react';
 import { Match, SKILL_LEVELS_SHORT, getSkillColor } from '@/lib/types';
 
 export default function RankingsPage() {
-  const { players, matches } = useSupabaseClub();
+  const { players, matches } = useClub();
 
   const getRankingsForPeriod = (periodMatches: Match[]) => {
     const stats: Record<string, { wins: number; total: number; diff: number }> = {};

@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { SupabaseClubProvider } from '@/context/SupabaseClubContext';
+import { ClubProvider } from '@/context/ClubContext';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { Header } from '@/components/layout/Header';
 import { Analytics } from '@vercel/analytics/next';
 import { RoleSelectorWrapper } from '@/components/role/RoleSelectorWrapper';
+import { SupabaseProvider } from '@/supabase/provider';
 
 export const metadata: Metadata = {
   title: 'MSW Badminton | Badminton Club',
@@ -29,17 +31,21 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background text-foreground">
         <ThemeProvider>
-          <SupabaseClubProvider>
-            <RoleSelectorWrapper>
-              <div className="flex flex-col h-screen md:min-h-screen w-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-auto">
-                  {children}
-                </main>
-              </div>
-            </RoleSelectorWrapper>
-            <Toaster />
-          </SupabaseClubProvider>
+          <SupabaseProvider>
+            <FirebaseClientProvider>
+              <ClubProvider>
+                <RoleSelectorWrapper>
+                  <div className="flex flex-col h-screen md:min-h-screen w-full overflow-hidden">
+                    <Header />
+                    <main className="flex-1 overflow-auto">
+                      {children}
+                    </main>
+                  </div>
+                </RoleSelectorWrapper>
+                <Toaster />
+              </ClubProvider>
+            </FirebaseClientProvider>
+          </SupabaseProvider>
         </ThemeProvider>
         <Analytics />
       </body>

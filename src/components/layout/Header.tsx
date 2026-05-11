@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Users, Trophy, Banknote, Settings, Plus, Zap, Swords, Sun, Moon, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
@@ -20,7 +20,7 @@ import { getSkillColor, SKILL_LEVELS_SHORT, Player, Court } from '@/lib/types';
 
 export function Header() {
   const pathname = usePathname();
-  const { courts, players, addCourt, startMatch, isPlayer, isAdmin } = useSupabaseClub();
+  const { courts, players, addCourt, startMatch, isPlayer, isAdmin } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
 

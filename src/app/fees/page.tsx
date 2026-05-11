@@ -2,7 +2,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from 'react';
-import { useSupabaseClub } from '@/context/SupabaseClubContext';
+import { useClub } from '@/context/ClubContext';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer } = useSupabaseClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer } = useClub();
   const [today, setToday] = useState<string>('');
 
   const [shuttleFee, setShuttleFee] = useState(0);

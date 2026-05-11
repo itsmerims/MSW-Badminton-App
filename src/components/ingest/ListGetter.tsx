@@ -6,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Calendar, Upload, Users } from 'lucide-react'
-import { useSupabaseClub } from '@/context/SupabaseClubContext'
+import { useClub } from '@/context/ClubContext'
 import { useToast } from '@/hooks/use-toast'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 
 export function ListGetter() {
-  const { ingestPlayersFromList } = useSupabaseClub()
+  const { ingestPlayersFromList } = useClub()
   const { toast } = useToast()
   const [isOpen, setIsOpen] = useState(false)
   const [namesText, setNamesText] = useState('')
