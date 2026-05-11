@@ -9,6 +9,7 @@ import { useClub } from '@/context/ClubContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -77,8 +78,14 @@ export default function Header() {
       <header className="h-16 border-b bg-card flex items-center justify-between px-6 shrink-0 shadow-md z-50 transition-colors">
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-primary text-primary-foreground shadow-sm">
-            <span className="text-sm font-black tracking-tighter">MSW</span>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-white shadow-sm">
+            <Image
+              src="/mswlogo.png"
+              alt="MSW Logo"
+              width={32}
+              height={32}
+              className="object-contain"
+            />
           </div>
           <div className="hidden sm:block">
             <h1 className="text-base font-black uppercase tracking-tighter leading-none text-primary">MSW Badminton</h1>

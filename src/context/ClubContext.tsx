@@ -80,13 +80,19 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     };
 
     const loadFromLocalStorage = () => {
+      const loadedSessions = load(STORAGE_KEYS.SESSIONS, []);
+      setSessions(loadedSessions);
+
+      if (loadedSessions.length > 0) {
+        const lastActiveSession = loadedSessions.find(s => s.is_active) || loadedSessions[loadedSessions.length - 1];
+        setCurrentSession(lastActiveSession);
+      }
+
       setPlayers(load(STORAGE_KEYS.PLAYERS, []));
       setCourts(load(STORAGE_KEYS.COURTS, []));
       setMatches(load(STORAGE_KEYS.MATCHES, []));
       setFees(load(STORAGE_KEYS.FEES, []));
       setPaymentMethods(load(STORAGE_KEYS.PAYMENT_METHODS, []));
-      setSessions(load(STORAGE_KEYS.SESSIONS, []));
-      setCurrentSession(load(STORAGE_KEYS.CURRENT_SESSION, null));
       setDefaultWinningScoreState(parseInt(localStorage.getItem(STORAGE_KEYS.WINNING_SCORE) || '21'));
 
       const savedAutoAdvance = localStorage.getItem(STORAGE_KEYS.AUTO_ADVANCE);
