@@ -146,6 +146,14 @@ export function ClubProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(firebaseCurrentSession));
         }
 
+        // Load payment methods from Firebase
+        const paymentMethodsSnapshot = await getDocs(collection(db, 'payment_methods'));
+        const firebasePaymentMethods = paymentMethodsSnapshot.docs.map(doc => doc.data() as PaymentMethod);
+        if (firebasePaymentMethods.length > 0) {
+          setPaymentMethods(firebasePaymentMethods);
+          localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(firebasePaymentMethods));
+        }
+
       } catch (error) {
         console.error('Firebase load error:', error);
         // Fallback to localStorage if Firebase fails
@@ -260,6 +268,21 @@ export function ClubProvider({ children }: { children: ReactNode }) {
         // Sync current session
         if (currentSession) {
           await setDoc(doc(db, 'current_session', 'active'), currentSession);
+        }
+
+        // Sync payment methods
+        const paymentMethodsRef = collection(db, 'payment_methods');
+        const paymentMethodsSnapshot = await getDocs(paymentMethodsRef);
+        const existingPaymentMethodIds = new Set(paymentMethodsSnapshot.docs.map(doc => doc.id));
+
+        for (const method of paymentMethods) {
+          const methodRef = doc(db, 'payment_methods', method.id);
+          await setDoc(methodRef, method, { merge: true });
+          existingPaymentMethodIds.delete(method.id);
+        }
+
+        for (const id of existingPaymentMethodIds) {
+          await deleteDoc(doc(db, 'payment_methods', id));
         }
 
       } catch (error) {

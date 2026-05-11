@@ -10,11 +10,43 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Banknote, QrCode, UserCheck, Calculator, Download } from 'lucide-react';
+import { Banknote, QrCode, UserCheck, Calculator, Download, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+
+function QRImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  return (
+    <div className="relative flex items-center justify-center">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+      {hasError ? (
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs font-black uppercase">
+          Failed to load
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          className={className}
+          onLoad={() => setIsLoading(false)}
+          onError={() => {
+            setIsLoading(false);
+            setHasError(true);
+          }}
+          style={{ opacity: isLoading ? 0 : 1 }}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function FeesPage() {
   const { players, fees, paymentMethods, updateFee, togglePayment } = useClub();
@@ -195,7 +227,9 @@ export default function FeesPage() {
                     {paymentMethods.map(method => (
                       <Card key={method.id} className="overflow-hidden border-2">
                         <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
-                        <div className="relative h-48 bg-white"><Image src={method.imageUrl} alt={method.name} fill className="object-contain p-4" /></div>
+                        <div className="h-48 bg-white flex items-center justify-center p-4">
+                          <QRImage src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
+                        </div>
                         <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{currentFee?.shuttleFee ? Math.round((currentFee.shuttleFee + currentFee.courtFee + (currentFee.entranceFee || 0)) / players.length) : 0}</div>
                       </Card>
                     ))}
@@ -229,7 +263,9 @@ export default function FeesPage() {
                       {paymentMethods.map(method => (
                         <Card key={method.id} className="overflow-hidden border-2">
                           <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
-                          <div className="relative h-64 bg-white"><Image src={method.imageUrl} alt={method.name} fill className="object-contain p-4" /></div>
+                          <div className="h-64 bg-white flex items-center justify-center p-4">
+                            <QRImage src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
+                          </div>
                           <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{perPlayerFee}</div>
                         </Card>
                       ))}
