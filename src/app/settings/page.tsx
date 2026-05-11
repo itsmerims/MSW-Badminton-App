@@ -283,7 +283,7 @@ export default function SettingsPage() {
                           <div>
                             <p className="text-xs font-black uppercase">{session.name}</p>
                             <p className="text-[9px] text-muted-foreground font-bold">
-                            {currentSession?.id === session.id ? players.length : session.registeredPlayers?.length || 0} players
+                              {currentSession?.id === session.id ? players.length : session.registeredPlayers?.length || 0} players
                             </p>
                           </div>
                           {currentSession?.id === session.id && (

@@ -13,7 +13,6 @@ import { Switch } from '@/components/ui/switch';
 import { Banknote, QrCode, UserCheck, Calculator, PlusCircle, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 type Court = { id: number; hours: number; costPerHour: number };
@@ -251,7 +250,10 @@ export default function FeesPage() {
                     {paymentMethods.map(method => (
                       <Card key={method.id} className="overflow-hidden border-2">
                         <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
-                        <div className="relative h-48 bg-white"><Image src={method.imageUrl} alt={method.name} fill className="object-contain p-4" /></div>
+                        <div className="h-48 bg-white flex items-center justify-center p-4">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
+                        </div>
                         <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{currentFee?.shuttleFee ? Math.round((currentFee.shuttleFee + currentFee.courtFee + (currentFee.entranceFee || 0)) / players.length) : 0}</div>
                       </Card>
                     ))}
@@ -285,7 +287,10 @@ export default function FeesPage() {
                       {paymentMethods.map(method => (
                         <Card key={method.id} className="overflow-hidden border-2">
                           <div className="bg-primary text-primary-foreground p-1 text-center text-[10px] font-black uppercase">{method.name}</div>
-                          <div className="relative h-64 bg-white"><Image src={method.imageUrl} alt={method.name} fill className="object-contain p-4" /></div>
+                          <div className="h-64 bg-white flex items-center justify-center p-4">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={method.imageUrl} alt={method.name} className="max-h-full max-w-full object-contain" />
+                          </div>
                           <div className="p-3 bg-secondary text-center text-sm font-black uppercase">Pay ₱{perPlayerFee}</div>
                         </Card>
                       ))}

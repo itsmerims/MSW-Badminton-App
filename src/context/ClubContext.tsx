@@ -44,6 +44,7 @@ interface ClubContextType {
   getCurrentSession: () => Session | null;
   registerPlayerForSession: (sessionId: string, deviceId: string, name: string) => void;
   ingestPlayersFromList: (names: string[], sessionDate: string) => Promise<{ newPlayersCount: number; existingPlayersCount: number }>;
+  getPlayerCountForSession: (sessionId: string) => number;
 }
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -84,7 +85,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       setSessions(loadedSessions);
 
       if (loadedSessions.length > 0) {
-        const lastActiveSession = loadedSessions.find(s => s.is_active) || loadedSessions[loadedSessions.length - 1];
+        const lastActiveSession = loadedSessions.find((s: Session) => s.is_active) || loadedSessions[loadedSessions.length - 1];
         setCurrentSession(lastActiveSession);
       }
 
@@ -811,7 +812,8 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
       addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
-      createSession, endSession, getSession, getCurrentSession, registerPlayerForSession, ingestPlayersFromList
+      createSession, endSession, getSession, getCurrentSession, registerPlayerForSession, ingestPlayersFromList,
+      getPlayerCountForSession: (sessionId: string) => players.filter(p => p.sessionId === sessionId).length,
     }}>
       {children}
     </ClubContext.Provider>
