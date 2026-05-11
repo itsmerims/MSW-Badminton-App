@@ -125,3 +125,17 @@ export interface PaymentMethod {
   name: string;
   imageUrl: string;
 }
+
+export interface SessionRegisteredPlayer {
+  deviceId: string;
+  name: string;
+  joinedAt: string;
+}
+
+export interface Session {
+  id: string;
+  name: string;
+  createdAt: string;
+  is_active: boolean;
+  registeredPlayers?: SessionRegisteredPlayer[];
+}

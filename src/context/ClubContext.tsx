@@ -1,9 +1,9 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Player, Court, Match, Fee, PaymentMethod, MatchStatus, PlayerSnapshot } from '@/lib/types';
+import { Player, Court, Match, Fee, PaymentMethod, MatchStatus, PlayerSnapshot, Session, SessionRegisteredPlayer } from '@/lib/types';
 import { SplashScreen } from '@/components/layout/SplashScreen';
+import { sendNotification } from '@/lib/notifications';
 
 interface ClubContextType {
   players: Player[];
@@ -11,6 +11,8 @@ interface ClubContextType {
   matches: Match[];
   fees: Fee[];
   paymentMethods: PaymentMethod[];
+  sessions: Session[];
+  currentSession: Session | null;
   defaultWinningScore: number;
   autoAdvanceEnabled: boolean;
   addPlayer: (player: Omit<Player, 'id' | 'wins' | 'gamesPlayed' | 'partnerHistory' | 'status' | 'improvementScore' | 'totalPlayTimeMinutes' | 'lastAvailableAt'>) => void;
@@ -34,6 +36,11 @@ interface ClubContextType {
   resetDailyBoard: () => void;
   wipeAllData: () => void;
   deleteMatch: (matchId: string) => void;
+  createSession: (name: string) => Session;
+  endSession: (sessionId: string) => void;
+  getSession: (sessionId: string) => Session | null;
+  getCurrentSession: () => Session | null;
+  registerPlayerForSession: (sessionId: string, deviceId: string, name: string) => void;
 }
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -45,7 +52,9 @@ const STORAGE_KEYS = {
   FEES: 'tbc_fees',
   PAYMENT_METHODS: 'tbc_payment_methods',
   WINNING_SCORE: 'tbc_winning_score',
-  AUTO_ADVANCE: 'tbc_auto_advance'
+  AUTO_ADVANCE: 'tbc_auto_advance',
+  SESSIONS: 'tbc_sessions',
+  CURRENT_SESSION: 'tbc_current_session'
 };
 
 export function ClubProvider({ children }: { children: ReactNode }) {
@@ -54,6 +63,8 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [fees, setFees] = useState<Fee[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [defaultWinningScore, setDefaultWinningScoreState] = useState<number>(21);
   const [autoAdvanceEnabled, setAutoAdvanceEnabledState] = useState<boolean>(true);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -70,6 +81,8 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setMatches(load(STORAGE_KEYS.MATCHES, []));
     setFees(load(STORAGE_KEYS.FEES, []));
     setPaymentMethods(load(STORAGE_KEYS.PAYMENT_METHODS, []));
+    setSessions(load(STORAGE_KEYS.SESSIONS, []));
+    setCurrentSession(load(STORAGE_KEYS.CURRENT_SESSION, null));
     setDefaultWinningScoreState(parseInt(localStorage.getItem(STORAGE_KEYS.WINNING_SCORE) || '21'));
     
     const savedAutoAdvance = localStorage.getItem(STORAGE_KEYS.AUTO_ADVANCE);
@@ -89,9 +102,11 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(matches));
     localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(fees));
     localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(paymentMethods));
+    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(currentSession));
     localStorage.setItem(STORAGE_KEYS.WINNING_SCORE, defaultWinningScore.toString());
     localStorage.setItem(STORAGE_KEYS.AUTO_ADVANCE, JSON.stringify(autoAdvanceEnabled));
-  }, [players, courts, matches, fees, paymentMethods, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
+  }, [players, courts, matches, fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -178,18 +193,36 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setMatches(prev => [newMatch, ...prev]);
 
     if (targetCourtId) {
-      setCourts(prev => prev.map(c => 
-        c.id === targetCourtId 
-          ? { ...c, status: 'occupied', currentMatchId: newMatchId } 
+      setCourts(prev => prev.map(c =>
+        c.id === targetCourtId
+          ? { ...c, status: 'occupied', currentMatchId: newMatchId }
           : c
       ));
     }
 
-    setPlayers(prev => prev.map(p => 
+    setPlayers(prev => prev.map(p =>
       [...matchData.teamA, ...matchData.teamB].includes(p.id)
         ? { ...p, status: 'playing', lastAvailableAt: undefined }
         : p
     ));
+
+    // Send notifications to registered players
+    if (currentSession?.registeredPlayers) {
+      const allPlayerIds = [...matchData.teamA, ...matchData.teamB];
+      allPlayerIds.forEach(playerId => {
+        const player = players.find(p => p.id === playerId);
+        if (player) {
+          const registeredPlayer = currentSession.registeredPlayers?.find(rp => rp.name === player.name);
+          if (registeredPlayer) {
+            sendNotification({
+              title: "It's Your Turn!",
+              body: `You've been selected for a match. Court ${targetCourtId ? courts.find(c => c.id === targetCourtId)?.name : 'Queue'}`,
+              icon: '/favicon.ico'
+            });
+          }
+        }
+      });
+    }
   };
 
   const updateMatchScore = (matchId: string, teamAScore: number, teamBScore: number) => {
@@ -376,12 +409,27 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const togglePayment = (date: string, playerId: string) => {
-    setFees(prev => prev.map(f => {
-      if (f.id !== date) return f;
-      const payments = { ...f.payments };
-      payments[playerId] = !payments[playerId];
-      return { ...f, payments };
-    }));
+    setFees(prev => {
+      const fee = prev.find(f => f.id === date);
+      if (!fee) {
+        // Create fee if it doesn't exist with player payment set to true
+        const newFee: Fee = {
+          id: date,
+          shuttleFee: 0,
+          courtFee: 0,
+          entranceFee: 0,
+          payments: { [playerId]: true }
+        };
+        return [...prev, newFee];
+      }
+      // Toggle existing fee
+      return prev.map(f => {
+        if (f.id !== date) return f;
+        const payments = { ...f.payments };
+        payments[playerId] = !payments[playerId];
+        return { ...f, payments };
+      });
+    });
   };
 
   const addPaymentMethod = (name: string, imageData: string) => {
@@ -415,15 +463,93 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setCourts(prev => prev.map(c => ({ ...c, status: 'available', currentMatchId: null })));
   };
 
+  const createSession = (name: string): Session => {
+    const sessionId = generateId();
+    const newSession: Session = {
+      id: sessionId,
+      name,
+      createdAt: new Date().toISOString(),
+      is_active: true,
+      registeredPlayers: []
+    };
+
+    console.log('[createSession] Creating session:', newSession);
+    setSessions(prev => [...prev, newSession]);
+    setCurrentSession(newSession);
+
+    // Optional: Try to sync with Supabase (graceful failure)
+    try {
+      // Supabase sync would go here if needed
+      console.log('[createSession] Session created locally');
+    } catch (error) {
+      console.warn('[createSession] Supabase sync failed, using local storage only');
+    }
+
+    return newSession;
+  };
+
+  const endSession = (sessionId: string) => {
+    console.log('[endSession] Ending session:', sessionId);
+
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, is_active: false } : s
+    ));
+
+    if (currentSession?.id === sessionId) {
+      setCurrentSession(null);
+      // Clear session state (players, matches, courts)
+      setPlayers([]);
+      setMatches([]);
+      setCourts([]);
+      console.log('[endSession] Session state cleared');
+    }
+  };
+
+  const getSession = (sessionId: string): Session | null => {
+    return sessions.find(s => s.id === sessionId) || null;
+  };
+
+  const getCurrentSession = (): Session | null => {
+    return currentSession;
+  };
+
+  const registerPlayerForSession = (sessionId: string, deviceId: string, name: string) => {
+    console.log('[registerPlayerForSession] Registering player:', { sessionId, deviceId, name });
+
+    const registeredPlayer: SessionRegisteredPlayer = {
+      deviceId,
+      name,
+      joinedAt: new Date().toISOString()
+    };
+
+    setSessions(prev => prev.map(s => {
+      if (s.id === sessionId) {
+        const existing = s.registeredPlayers?.find(p => p.deviceId === deviceId);
+        if (existing) return s; // Already registered
+        return {
+          ...s,
+          registeredPlayers: [...(s.registeredPlayers || []), registeredPlayer]
+        };
+      }
+      return s;
+    }));
+
+    // Add player to the system with default skill level 3
+    addPlayer({ name, skillLevel: 3 });
+  };
+
   const wipeAllData = () => {
     setPlayers([]);
     setCourts([]);
     setMatches([]);
     setFees([]);
     setPaymentMethods([]);
+    setSessions([]);
+    setCurrentSession(null);
     setDefaultWinningScoreState(21);
     setAutoAdvanceEnabledState(true);
     localStorage.clear();
+    console.log('[wipeAllData] All data cleared from localStorage');
   };
 
   if (!isLoaded) {
@@ -432,10 +558,11 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
   return (
     <ClubContext.Provider value={{
-      players, courts, matches, fees, paymentMethods, defaultWinningScore, autoAdvanceEnabled,
+      players, courts, matches, fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
-      addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled
+      addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
+      createSession, endSession, getSession, getCurrentSession, registerPlayerForSession
     }}>
       {children}
     </ClubContext.Provider>

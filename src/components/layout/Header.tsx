@@ -69,18 +69,17 @@ export function Header() {
   };
 
   return (
-    <>
-      <header className="h-14 md:h-16 border-b bg-card flex items-center justify-between px-4 md:px-6 shrink-0 shadow-md z-50 transition-colors">
-        <div className="flex items-center gap-4 md:gap-6">
-          <Link href="/" className="flex items-center gap-2 md:gap-3 hover:opacity-80 transition-opacity">
-            <div className="flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg border bg-primary text-primary-foreground shadow-sm">
-              <span className="text-xs md:text-sm font-black tracking-tighter">MSW</span>
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-sm md:text-base font-black uppercase tracking-tighter leading-none text-primary">MSW Badminton</h1>
-              <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.25em] mt-1">Command Center</p>
-            </div>
-          </Link>
+    <header className="h-16 border-b bg-card flex items-center justify-between px-6 shrink-0 shadow-md z-50 transition-colors">
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-primary text-primary-foreground shadow-sm">
+            <span className="text-sm font-black tracking-tighter">MSW</span>
+          </div>
+          <div className="hidden sm:block">
+            <h1 className="text-base font-black uppercase tracking-tighter leading-none text-primary">MSW Badminton</h1>
+            <p className="text-[8px] text-muted-foreground font-black uppercase tracking-[0.25em] mt-1">Command Center</p>
+          </div>
+        </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1 ml-6 border-l pl-6">

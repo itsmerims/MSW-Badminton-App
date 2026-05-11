@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef } from 'react';
@@ -9,22 +8,25 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { RefreshCcw, Trash2, QrCode, Upload, Loader2, Sun, Moon, Palette, Settings as SettingsIcon, Trophy, Zap } from 'lucide-react';
+import { RefreshCcw, Trash2, QrCode, Upload, Loader2, Sun, Moon, Palette, Settings as SettingsIcon, Trophy, Zap, Share2, Calendar, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
   const {
     paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
-    autoAdvanceEnabled, setAutoAdvanceEnabled, isPlayer, isAdmin
+    autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession
   } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [newMethodName, setNewMethodName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [copiedSessionLink, setCopiedSessionLink] = useState(false);
 
   const processAndUpload = (file: File, callback: (data: string) => void) => {
     const reader = new FileReader();
@@ -91,6 +93,24 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined' && window.confirm("Delete EVERYTHING? This cannot be undone.")) {
       wipeAllData();
       toast({ title: "All data wiped" });
+    }
+  };
+
+  const handleCopySessionLink = () => {
+    if (!currentSession) return;
+    const link = `${window.location.origin}/join/${currentSession.id}`;
+    navigator.clipboard.writeText(link);
+    setCopiedSessionLink(true);
+    toast({ title: 'Link copied to clipboard' });
+    setTimeout(() => setCopiedSessionLink(false), 2000);
+  };
+
+  const handleEndSession = () => {
+    if (!currentSession) return;
+    if (window.confirm('Are you sure you want to end this session? This will clear all players, matches, and courts.')) {
+      endSession(currentSession.id);
+      toast({ title: 'Session ended' });
+      router.push('/sessions');
     }
   };
 
@@ -186,30 +206,98 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-6">
-          {!isPlayer && (
-            <Card className="border-2 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                  <QrCode className="h-4 w-4" /> QR Payments
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase">Manage payment codes.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase opacity-60">Account Name</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g. GCash"
-                      value={newMethodName}
-                      onChange={e => setNewMethodName(e.target.value)}
-                      className="font-bold text-xs"
-                    />
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    <Button size="icon" onClick={triggerFileUpload} disabled={isUploading} className="shrink-0">
-                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+          <Card className="border-2 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                <Calendar className="h-4 w-4" /> Session
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">Current active session</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {currentSession ? (
+                <>
+                  <div className="p-4 bg-primary/5 rounded-xl border-2 border-primary/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase text-muted-foreground">Session Name</p>
+                        <p className="text-sm font-black">{currentSession.name}</p>
+                      </div>
+                      <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase text-muted-foreground">Players</p>
+                        <p className="text-sm font-black">{currentSession.registeredPlayers?.length || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={handleCopySessionLink}
+                      className="w-full font-black uppercase text-[10px] tracking-widest h-10 gap-2"
+                      variant="outline"
+                    >
+                      {copiedSessionLink ? (
+                        <>
+                          <Check className="h-4 w-4 text-green-600" /> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="h-4 w-4" /> Share Link
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button 
+                      onClick={handleEndSession}
+                      className="w-full font-black uppercase text-[10px] tracking-widest h-10"
+                      variant="destructive"
+                    >
+                      End Session
                     </Button>
                   </div>
+                </>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-black uppercase opacity-40">No active session</p>
+                  <p className="text-xs font-bold uppercase mt-1 opacity-30">Create a session to get started</p>
+                  <Button 
+                    onClick={() => router.push('/sessions')}
+                    className="mt-4 font-black uppercase text-[10px] tracking-widest h-10"
+                    variant="outline"
+                  >
+                    Go to Sessions
+                  </Button>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                <QrCode className="h-4 w-4" /> QR Payments
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">Manage payment codes.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase opacity-60">Account Name</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="e.g. GCash" 
+                    value={newMethodName} 
+                    onChange={e => setNewMethodName(e.target.value)}
+                    className="font-bold text-xs"
+                  />
+                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
+                  <Button size="icon" onClick={triggerFileUpload} disabled={isUploading} className="shrink-0">
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   {paymentMethods.map(method => (
