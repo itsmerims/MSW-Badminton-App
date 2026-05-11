@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { supabase } from '@/supabase/client';
 
 export async function POST(request: Request) {
   try {
@@ -10,18 +9,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing feeId or qrCodeUrl' }, { status: 400 });
     }
 
-    const feeDocRef = doc(db, 'fees', feeId);
-    const feeDoc = await getDoc(feeDocRef);
+    // Store the QR code URL in Supabase storage or database
+    // For now, we'll store it in a Supabase table
+    const { error } = await supabase
+      .from('fee_qr_codes')
+      .upsert({ fee_id: feeId, qr_code_url: qrCodeUrl }, { onConflict: 'fee_id' });
 
-    if (!feeDoc.exists()) {
-      return NextResponse.json({ error: 'Fee not found' }, { status: 404 });
+    if (error) {
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: 'Failed to update QR code URL' }, { status: 500 });
     }
 
-    await updateDoc(feeDocRef, { qrCodeUrl });
-
-    return NextResponse.json({ message: 'Fee updated successfully' });
+    return NextResponse.json({ message: 'Fee QR code updated successfully' });
   } catch (error) {
     console.error('Error updating fee:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const feeId = searchParams.get('feeId');
+
+    if (!feeId) {
+      return NextResponse.json({ error: 'Missing feeId' }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from('fee_qr_codes')
+      .select('qr_code_url')
+      .eq('fee_id', feeId)
+      .single();
+
+    if (error) {
+      console.error('Supabase error:', error);
+      return NextResponse.json({ error: 'Failed to fetch QR code URL' }, { status: 500 });
+    }
+
+    return NextResponse.json({ qrCodeUrl: data?.qr_code_url || null });
+  } catch (error) {
+    console.error('Error fetching fee:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

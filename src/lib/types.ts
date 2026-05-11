@@ -72,6 +72,7 @@ export interface Player {
   improvementScore: number;
   totalPlayTimeMinutes: number;
   lastAvailableAt?: number;
+  sessionId?: string;
 }
 
 export interface Court {
@@ -79,6 +80,7 @@ export interface Court {
   name: string;
   status: CourtStatus;
   currentMatchId?: string | null;
+  sessionId?: string;
 }
 
 export interface Match {
@@ -96,6 +98,7 @@ export interface Match {
   isCompleted: boolean;
   status: MatchStatus;
   winner?: 'teamA' | 'teamB' | null;
+  sessionId?: string;
 }
 
 export interface Fee {

@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useClub } from '@/context/ClubContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Copy, Check, Plus, Calendar, Users, Share2, Clock } from 'lucide-react';
+import { Trash2, Plus, Play, Users, Clock, Calendar, Check, Share2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 export default function SessionsPage() {
@@ -51,6 +52,12 @@ export default function SessionsPage() {
       endSession(sessionId);
       toast({ title: 'Session ended' });
     }
+  };
+
+  const handleEnterSession = (sessionId: string) => {
+    localStorage.setItem('tbc_current_session_id', sessionId);
+    toast({ title: 'Session entered', description: 'You are now in this session' });
+    router.push('/');
   };
 
   const formatDate = (dateString: string) => {
@@ -111,7 +118,11 @@ export default function SessionsPage() {
 
         {/* Ongoing Sessions */}
         {ongoingSessions.map(session => (
-          <Card key={session.id} className="border-2 bg-card min-h-[200px] flex flex-col">
+          <Card
+            key={session.id}
+            className="border-2 bg-card min-h-[200px] flex flex-col cursor-pointer hover:border-primary transition-all"
+            onClick={() => handleEnterSession(session.id)}
+          >
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
@@ -136,10 +147,13 @@ export default function SessionsPage() {
                   <span className="font-black">Active</span>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
-                <Button 
-                  onClick={() => handleCopyLink(session.id)}
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyLink(session.id);
+                  }}
                   className="w-full font-black uppercase text-[10px] tracking-widest h-10 gap-2"
                   variant="outline"
                 >
@@ -153,10 +167,13 @@ export default function SessionsPage() {
                     </>
                   )}
                 </Button>
-                
+
                 {currentSession?.id === session.id && (
-                  <Button 
-                    onClick={() => handleEndSession(session.id)}
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEndSession(session.id);
+                    }}
                     className="w-full font-black uppercase text-[10px] tracking-widest h-10"
                     variant="destructive"
                   >

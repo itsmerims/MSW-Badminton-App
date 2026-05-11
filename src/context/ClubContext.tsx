@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Player, Court, Match, Fee, PaymentMethod, MatchStatus, PlayerSnapshot, Session, SessionRegisteredPlayer } from '@/lib/types';
 import { SplashScreen } from '@/components/layout/SplashScreen';
 import { sendNotification } from '@/lib/notifications';
+import { uploadQRCodeToSupabase, deleteQRCodeFromSupabase } from '@/supabase/storage';
 
 interface ClubContextType {
   players: Player[];
@@ -29,8 +30,8 @@ interface ClubContextType {
   createCourtAndAssignMatch: (matchId: string) => void;
   updateFee: (fee: Omit<Fee, 'payments'>) => void;
   togglePayment: (date: string, playerId: string) => void;
-  addPaymentMethod: (name: string, imageData: string) => void;
-  deletePaymentMethod: (id: string) => void;
+  addPaymentMethod: (name: string, imageData: string) => Promise<void>;
+  deletePaymentMethod: (id: string) => Promise<void>;
   setDefaultWinningScore: (score: number) => void;
   setAutoAdvanceEnabled: (enabled: boolean) => void;
   resetDailyBoard: () => void;
@@ -41,6 +42,7 @@ interface ClubContextType {
   getSession: (sessionId: string) => Session | null;
   getCurrentSession: () => Session | null;
   registerPlayerForSession: (sessionId: string, deviceId: string, name: string) => void;
+  ingestPlayersFromList: (names: string[], sessionDate: string) => Promise<{ newPlayersCount: number; existingPlayersCount: number }>;
 }
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -76,18 +78,86 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       return saved ? JSON.parse(saved) : fallback;
     };
 
-    setPlayers(load(STORAGE_KEYS.PLAYERS, []));
-    setCourts(load(STORAGE_KEYS.COURTS, []));
-    setMatches(load(STORAGE_KEYS.MATCHES, []));
-    setFees(load(STORAGE_KEYS.FEES, []));
-    setPaymentMethods(load(STORAGE_KEYS.PAYMENT_METHODS, []));
-    setSessions(load(STORAGE_KEYS.SESSIONS, []));
-    setCurrentSession(load(STORAGE_KEYS.CURRENT_SESSION, null));
-    setDefaultWinningScoreState(parseInt(localStorage.getItem(STORAGE_KEYS.WINNING_SCORE) || '21'));
-    
-    const savedAutoAdvance = localStorage.getItem(STORAGE_KEYS.AUTO_ADVANCE);
-    setAutoAdvanceEnabledState(savedAutoAdvance !== null ? JSON.parse(savedAutoAdvance) : true);
-    
+    const loadFromLocalStorage = () => {
+      setPlayers(load(STORAGE_KEYS.PLAYERS, []));
+      setCourts(load(STORAGE_KEYS.COURTS, []));
+      setMatches(load(STORAGE_KEYS.MATCHES, []));
+      setFees(load(STORAGE_KEYS.FEES, []));
+      setPaymentMethods(load(STORAGE_KEYS.PAYMENT_METHODS, []));
+      setSessions(load(STORAGE_KEYS.SESSIONS, []));
+      setCurrentSession(load(STORAGE_KEYS.CURRENT_SESSION, null));
+      setDefaultWinningScoreState(parseInt(localStorage.getItem(STORAGE_KEYS.WINNING_SCORE) || '21'));
+
+      const savedAutoAdvance = localStorage.getItem(STORAGE_KEYS.AUTO_ADVANCE);
+      setAutoAdvanceEnabledState(savedAutoAdvance !== null ? JSON.parse(savedAutoAdvance) : true);
+    };
+
+    const loadFromFirebase = async () => {
+      try {
+        // Dynamic import Firebase to avoid build issues
+        const { db } = await import('@/firebase/config');
+        const { doc, setDoc, getDoc, collection, getDocs, updateDoc, deleteDoc } = await import('firebase/firestore');
+
+        // Load players from Firebase
+        const playersSnapshot = await getDocs(collection(db, 'players'));
+        const firebasePlayers = playersSnapshot.docs.map(doc => doc.data() as Player);
+        if (firebasePlayers.length > 0) {
+          setPlayers(firebasePlayers);
+          localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(firebasePlayers));
+        }
+
+        // Load courts from Firebase
+        const courtsSnapshot = await getDocs(collection(db, 'courts'));
+        const firebaseCourts = courtsSnapshot.docs.map(doc => doc.data() as Court);
+        if (firebaseCourts.length > 0) {
+          setCourts(firebaseCourts);
+          localStorage.setItem(STORAGE_KEYS.COURTS, JSON.stringify(firebaseCourts));
+        }
+
+        // Load matches from Firebase
+        const matchesSnapshot = await getDocs(collection(db, 'matches'));
+        const firebaseMatches = matchesSnapshot.docs.map(doc => doc.data() as Match);
+        if (firebaseMatches.length > 0) {
+          setMatches(firebaseMatches);
+          localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(firebaseMatches));
+        }
+
+        // Load sessions from Firebase
+        const sessionsSnapshot = await getDocs(collection(db, 'sessions'));
+        const firebaseSessions = sessionsSnapshot.docs.map(doc => doc.data() as Session);
+        if (firebaseSessions.length > 0) {
+          setSessions(firebaseSessions);
+          localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(firebaseSessions));
+        }
+
+        // Load current session from Firebase
+        const currentSessionDoc = await getDoc(doc(db, 'current_session', 'active'));
+        if (currentSessionDoc.exists()) {
+          const firebaseCurrentSession = currentSessionDoc.data() as Session;
+          setCurrentSession(firebaseCurrentSession);
+          localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(firebaseCurrentSession));
+        }
+
+      } catch (error) {
+        console.error('Firebase load error:', error);
+        // Fallback to localStorage if Firebase fails
+        loadFromLocalStorage();
+      }
+    };
+
+    // Check if localStorage has data, if not try to load from Firebase
+    const hasLocalData = localStorage.getItem(STORAGE_KEYS.PLAYERS) &&
+                        localStorage.getItem(STORAGE_KEYS.COURTS);
+
+    if (hasLocalData) {
+      loadFromLocalStorage();
+    } else {
+      loadFromFirebase().then(() => {
+        // If Firebase also has no data, load empty state
+        loadFromLocalStorage();
+      });
+    }
+
     const timer = setTimeout(() => {
       setIsLoaded(true);
     }, 1500);
@@ -108,6 +178,92 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.AUTO_ADVANCE, JSON.stringify(autoAdvanceEnabled));
   }, [players, courts, matches, fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
 
+  // Firebase sync: Local storage is source of truth, Firebase is backup
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const syncToFirebase = async () => {
+      try {
+        // Dynamic import Firebase to avoid build issues
+        const { db } = await import('@/firebase/config');
+        const { doc, setDoc, getDoc, collection, getDocs, updateDoc, deleteDoc } = await import('firebase/firestore');
+
+        // Sync players
+        const playersRef = collection(db, 'players');
+        const playersSnapshot = await getDocs(playersRef);
+        const existingPlayerIds = new Set(playersSnapshot.docs.map(doc => doc.id));
+
+        for (const player of players) {
+          const playerRef = doc(db, 'players', player.id);
+          await setDoc(playerRef, player, { merge: true });
+          existingPlayerIds.delete(player.id);
+        }
+
+        // Delete players that no longer exist locally
+        for (const id of existingPlayerIds) {
+          await deleteDoc(doc(db, 'players', id));
+        }
+
+        // Sync courts
+        const courtsRef = collection(db, 'courts');
+        const courtsSnapshot = await getDocs(courtsRef);
+        const existingCourtIds = new Set(courtsSnapshot.docs.map(doc => doc.id));
+
+        for (const court of courts) {
+          const courtRef = doc(db, 'courts', court.id);
+          await setDoc(courtRef, court, { merge: true });
+          existingCourtIds.delete(court.id);
+        }
+
+        for (const id of existingCourtIds) {
+          await deleteDoc(doc(db, 'courts', id));
+        }
+
+        // Sync matches
+        const matchesRef = collection(db, 'matches');
+        const matchesSnapshot = await getDocs(matchesRef);
+        const existingMatchIds = new Set(matchesSnapshot.docs.map(doc => doc.id));
+
+        for (const match of matches) {
+          const matchRef = doc(db, 'matches', match.id);
+          await setDoc(matchRef, match, { merge: true });
+          existingMatchIds.delete(match.id);
+        }
+
+        for (const id of existingMatchIds) {
+          await deleteDoc(doc(db, 'matches', id));
+        }
+
+        // Sync sessions
+        const sessionsRef = collection(db, 'sessions');
+        const sessionsSnapshot = await getDocs(sessionsRef);
+        const existingSessionIds = new Set(sessionsSnapshot.docs.map(doc => doc.id));
+
+        for (const session of sessions) {
+          const sessionRef = doc(db, 'sessions', session.id);
+          await setDoc(sessionRef, session, { merge: true });
+          existingSessionIds.delete(session.id);
+        }
+
+        for (const id of existingSessionIds) {
+          await deleteDoc(doc(db, 'sessions', id));
+        }
+
+        // Sync current session
+        if (currentSession) {
+          await setDoc(doc(db, 'current_session', 'active'), currentSession);
+        }
+
+      } catch (error) {
+        console.error('Firebase sync error:', error);
+      }
+    };
+
+    // Debounce sync to avoid too many writes
+    const timeoutId = setTimeout(syncToFirebase, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [players, courts, matches, sessions, currentSession, isLoaded]);
+
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   const addPlayer = (data: any) => {
@@ -120,7 +276,8 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       status: 'available',
       improvementScore: 0,
       totalPlayTimeMinutes: 0,
-      lastAvailableAt: Date.now()
+      lastAvailableAt: Date.now(),
+      sessionId: currentSession?.id
     };
     setPlayers(prev => [...prev, newPlayer]);
   };
@@ -138,13 +295,14 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       .map(c => parseInt(c.name.replace('Court ', '')))
       .filter(n => !isNaN(n));
     const nextNum = courtNumbers.length > 0 ? Math.max(...courtNumbers) + 1 : 1;
-    
+
     const id = generateId();
     const newCourt: Court = {
       id,
       name: name ? `Court ${name}` : `Court ${nextNum}`,
       status: 'available',
-      currentMatchId: null
+      currentMatchId: null,
+      sessionId: currentSession?.id
     };
     setCourts(prev => [...prev, newCourt]);
     return id;
@@ -182,13 +340,17 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     const newMatch: Match = {
       ...matchData,
       id: newMatchId,
-      courtId: targetCourtId,
       teamASnapshots,
       teamBSnapshots,
       timestamp: new Date().toISOString(),
       isCompleted: false,
-      status: 'ongoing'
+      status: 'ongoing',
+      sessionId: currentSession?.id
     };
+
+    if (targetCourtId) {
+      newMatch.courtId = targetCourtId;
+    }
 
     setMatches(prev => [newMatch, ...prev]);
 
@@ -202,7 +364,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
     setPlayers(prev => prev.map(p =>
       [...matchData.teamA, ...matchData.teamB].includes(p.id)
-        ? { ...p, status: 'playing', lastAvailableAt: undefined }
+        ? { ...p, status: 'playing' }
         : p
     ));
 
@@ -370,7 +532,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     
     setPlayers(prev => prev.map(p => {
       if (p.id === oldPlayerId) return { ...p, status: 'available', lastAvailableAt: Date.now() };
-      if (p.id === newPlayerId) return { ...p, status: 'playing', lastAvailableAt: undefined };
+      if (p.id === newPlayerId) return { ...p, status: 'playing' };
       return p;
     }));
   };
@@ -432,12 +594,28 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const addPaymentMethod = (name: string, imageData: string) => {
-    const newMethod: PaymentMethod = { id: generateId(), name, imageUrl: imageData };
-    setPaymentMethods(prev => [...prev, newMethod]);
+  const addPaymentMethod = async (name: string, imageData: string) => {
+    const id = generateId();
+    try {
+      // Upload to Supabase storage
+      const imageUrl = await uploadQRCodeToSupabase(id, imageData);
+      const newMethod: PaymentMethod = { id, name, imageUrl };
+      setPaymentMethods(prev => [...prev, newMethod]);
+    } catch (error) {
+      console.error('Failed to upload QR code to Supabase:', error);
+      // Fallback to localStorage if Supabase fails
+      const newMethod: PaymentMethod = { id, name, imageUrl: imageData };
+      setPaymentMethods(prev => [...prev, newMethod]);
+    }
   };
 
-  const deletePaymentMethod = (id: string) => {
+  const deletePaymentMethod = async (id: string) => {
+    try {
+      // Delete from Supabase storage
+      await deleteQRCodeFromSupabase(id);
+    } catch (error) {
+      console.error('Failed to delete QR code from Supabase:', error);
+    }
     setPaymentMethods(prev => prev.filter(pm => pm.id !== id));
   };
 
@@ -497,11 +675,10 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
     if (currentSession?.id === sessionId) {
       setCurrentSession(null);
-      // Clear session state (players, matches, courts)
-      setPlayers([]);
+      // Clear session state (matches, courts) but preserve players for rankings
       setMatches([]);
       setCourts([]);
-      console.log('[endSession] Session state cleared');
+      console.log('[endSession] Session state cleared (preserving players for rankings)');
     }
   };
 
@@ -538,6 +715,68 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     addPlayer({ name, skillLevel: 3 });
   };
 
+  const ingestPlayersFromList = async (names: string[], sessionDate: string): Promise<{ newPlayersCount: number; existingPlayersCount: number }> => {
+    console.log('[ingestPlayersFromList] Ingesting players:', { names, sessionDate });
+
+    let newPlayersCount = 0;
+    let existingPlayersCount = 0;
+
+    const sessionTimestamp = new Date(sessionDate).getTime();
+    const validTimestamp = !isNaN(sessionTimestamp) ? sessionTimestamp : Date.now();
+
+    // First, count existing players by first name
+    const firstNameCounts: Record<string, number> = {};
+    for (const player of players) {
+      const firstName = player.name.split(' ')[0].toLowerCase();
+      firstNameCounts[firstName] = (firstNameCounts[firstName] || 0) + 1;
+    }
+
+    // Count incoming names by first name
+    const incomingFirstNameCounts: Record<string, number> = {};
+    for (const name of names) {
+      const firstName = name.split(' ')[0].toLowerCase();
+      incomingFirstNameCounts[firstName] = (incomingFirstNameCounts[firstName] || 0) + 1;
+    }
+
+    for (const fullName of names) {
+      const nameParts = fullName.trim().split(' ').filter(n => n.length > 0);
+      const firstName = nameParts[0];
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+
+      // Check if this first name has duplicates (existing + incoming)
+      const existingCount = firstNameCounts[firstName.toLowerCase()] || 0;
+      const incomingCount = incomingFirstNameCounts[firstName.toLowerCase()] || 0;
+      const hasDuplicates = (existingCount + incomingCount) > 1;
+
+      // Determine the display name
+      let displayName = firstName;
+      if (hasDuplicates && lastName) {
+        const initial = lastName.charAt(0).toUpperCase();
+        displayName = `${firstName} ${initial}.`;
+      }
+
+      // Check if player already exists (case-insensitive on display name)
+      const existingPlayer = players.find(p => p.name.toLowerCase() === displayName.toLowerCase());
+
+      if (existingPlayer) {
+        existingPlayersCount++;
+        // Update lastAvailableAt for existing players
+        updatePlayer(existingPlayer.id, { lastAvailableAt: validTimestamp });
+      } else {
+        newPlayersCount++;
+        // Add new player with default skill level 3
+        addPlayer({
+          name: displayName,
+          skillLevel: 3,
+          lastAvailableAt: validTimestamp
+        });
+      }
+    }
+
+    console.log('[ingestPlayersFromList] Complete:', { newPlayersCount, existingPlayersCount });
+    return { newPlayersCount, existingPlayersCount };
+  };
+
   const wipeAllData = () => {
     setPlayers([]);
     setCourts([]);
@@ -558,11 +797,14 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
   return (
     <ClubContext.Provider value={{
-      players, courts, matches, fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled,
+      players: players.filter(p => !p.sessionId || p.sessionId === currentSession?.id),
+      courts: courts.filter(c => !c.sessionId || c.sessionId === currentSession?.id),
+      matches: matches.filter(m => !m.sessionId || m.sessionId === currentSession?.id),
+      fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
       addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
-      createSession, endSession, getSession, getCurrentSession, registerPlayerForSession
+      createSession, endSession, getSession, getCurrentSession, registerPlayerForSession, ingestPlayersFromList
     }}>
       {children}
     </ClubContext.Provider>

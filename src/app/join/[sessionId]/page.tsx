@@ -13,11 +13,11 @@ import { AlertCircle, CheckCircle, Bell, User, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getOrCreateDeviceId, requestNotificationPermission, setNotificationPreference } from '@/lib/notifications';
 
-export default function JoinSessionPage() {
-  const params = useParams();
-  const router = useRouter();
-  const { getSession, registerPlayerForSession } = useClub();
+export default function JoinSessionPage({ params }: { params: { sessionId: string } }) {
+  const { sessionId } = params;
+  const { sessions, registerPlayerForSession, getCurrentSession, getSession } = useClub();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [playerName, setPlayerName] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -29,7 +29,7 @@ export default function JoinSessionPage() {
   useEffect(() => {
     const sessionId = params.sessionId as string;
     const sessionData = getSession(sessionId);
-    
+
     if (!sessionData) {
       setError('Session not found or has ended');
     } else if (!sessionData.is_active) {

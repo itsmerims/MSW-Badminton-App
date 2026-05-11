@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useClub } from '@/context/ClubContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -18,11 +19,29 @@ import { cn } from '@/lib/utils';
 import { Player, Court, Match } from '@/lib/types';
 
 export default function CourtsPage() {
+  const { sessionId } = useParams();
+  const router = useRouter();
+  const { sessions } = useClub();
   const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch, defaultWinningScore } = useClub();
   const { toast } = useToast();
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [newCourtName, setNewCourtName] = useState('');
   const [scoringCourtId, setScoringCourtId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
+      toast({ title: 'Session not found', variant: 'destructive' });
+      router.push('/session');
+      return;
+    }
+    if (!session.is_active) {
+      toast({ title: 'Session has ended', variant: 'destructive' });
+      router.push('/session');
+      return;
+    }
+    localStorage.setItem('tbc_current_session_id', sessionId as string);
+  }, [sessionId, sessions, router, toast]);
 
   const handleAddCourt = async () => {
     if (!newCourtName) return;
@@ -71,7 +90,10 @@ export default function CourtsPage() {
           teamB: result.teamB,
           courtId: result.courtId,
         });
-        toast({ title: "Match Started!", description: result.analysis });
+        toast({
+          title: "Match Started!",
+          description: result.balanceScore ? `${result.balanceScore}% Balanced` : result.analysis
+        });
       } else {
         toast({ title: "No optimal match", description: result.error || "Logic engine couldn't find a balance." });
       }

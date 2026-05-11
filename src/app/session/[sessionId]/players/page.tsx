@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useClub } from '@/context/ClubContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,9 +32,27 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function PlayersPage() {
+  const { sessionId } = useParams();
+  const router = useRouter();
+  const { sessions } = useClub();
   const { players, addPlayer, updatePlayer, deletePlayer } = useClub();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (!session) {
+      toast({ title: 'Session not found', variant: 'destructive' });
+      router.push('/session');
+      return;
+    }
+    if (!session.is_active) {
+      toast({ title: 'Session has ended', variant: 'destructive' });
+      router.push('/session');
+      return;
+    }
+    localStorage.setItem('tbc_current_session_id', sessionId as string);
+  }, [sessionId, sessions, router, toast]);
 
   const [newName, setNewName] = useState('');
   const [newSkill, setNewSkill] = useState('3');

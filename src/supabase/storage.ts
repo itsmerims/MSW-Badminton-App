@@ -1,5 +1,7 @@
 import { supabase } from './client';
 
+const QR_CODE_BUCKET = 'msw-badminton';
+
 /**
  * Uploads a file to a specified Supabase storage bucket.
  *
@@ -36,4 +38,47 @@ export const uploadFileToSupabase = async (
   }
 
   return urlData.publicUrl;
+};
+
+/**
+ * Uploads a QR code image to Supabase storage.
+ *
+ * @param paymentMethodId The ID of the payment method.
+ * @param imageData Base64 encoded image data or File object.
+ * @returns The public URL of the uploaded QR code.
+ */
+export const uploadQRCodeToSupabase = async (
+  paymentMethodId: string,
+  imageData: string | File
+): Promise<string> => {
+  let file: File;
+
+  if (typeof imageData === 'string') {
+    // Convert base64 to File
+    const response = await fetch(imageData);
+    const blob = await response.blob();
+    file = new File([blob], `qr-${paymentMethodId}.png`, { type: 'image/png' });
+  } else {
+    file = imageData;
+  }
+
+  const path = `payment-methods/${paymentMethodId}.png`;
+  return uploadFileToSupabase(QR_CODE_BUCKET, path, file);
+};
+
+/**
+ * Deletes a QR code image from Supabase storage.
+ *
+ * @param paymentMethodId The ID of the payment method.
+ */
+export const deleteQRCodeFromSupabase = async (paymentMethodId: string): Promise<void> => {
+  const path = `payment-methods/${paymentMethodId}.png`;
+  const { error } = await supabase.storage
+    .from(QR_CODE_BUCKET)
+    .remove([path]);
+
+  if (error) {
+    console.error('Supabase delete error:', error);
+    throw new Error(`Failed to delete file: ${error.message}`);
+  }
 };

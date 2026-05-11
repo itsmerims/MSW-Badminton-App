@@ -16,12 +16,13 @@ import { generateDeterministicMatch } from '@/lib/matchmaking';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { getSkillColor, SKILL_LEVELS_SHORT, Player, Court } from '@/lib/types';
+import { Player, Court } from '@/lib/types';
+import { getSkillColor, SKILL_LEVELS_SHORT } from '@/lib/types';
 
-export function Header() {
-  const pathname = usePathname();
-  const { courts, players, addCourt, startMatch } = useClub();
+export default function Header() {
   const { theme, toggleTheme } = useTheme();
+  const pathname = usePathname();
+  const { players, courts, startMatch, addCourt, currentSession } = useClub();
   const { toast } = useToast();
 
   const [isManualOpen, setIsManualOpen] = useState(false);
@@ -30,10 +31,10 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { label: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { label: 'Players', href: '/players', icon: Users },
+    { label: 'Dashboard', href: currentSession ? `/session/${currentSession.id}` : '/', icon: LayoutDashboard },
+    { label: 'Players', href: currentSession ? `/session/${currentSession.id}/players` : '/players', icon: Users },
     { label: 'Rankings', href: '/rankings', icon: Trophy },
-    { label: 'Fees', href: '/fees', icon: Banknote },
+    { label: 'Fees', href: currentSession ? `/session/${currentSession.id}/fees` : '/fees', icon: Banknote },
     { label: 'Settings', href: '/settings', icon: Settings },
   ];
 
@@ -44,7 +45,10 @@ export function Header() {
 
     if (result.matchCreated && result.teamA && result.teamB) {
       await startMatch({ teamA: result.teamA, teamB: result.teamB, courtId: result.courtId });
-      toast({ title: result.courtId ? "Match Started!" : "Match Queued!" });
+      toast({
+        title: result.courtId ? "Match Started!" : "Match Queued!",
+        description: result.balanceScore ? `${result.balanceScore}% Balanced` : result.analysis
+      });
     } else {
       toast({ title: "Matchmaking Error", description: result.error || "Need 4 players.", variant: "destructive" });
     }

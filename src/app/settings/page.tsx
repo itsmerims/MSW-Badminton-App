@@ -12,12 +12,14 @@ import { RefreshCcw, Trash2, QrCode, Upload, Loader2, Sun, Moon, Palette, Settin
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const {
     paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
-    autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession
+    autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession,
+    sessions
   } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
@@ -63,11 +65,11 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setIsUploading(true);
-      processAndUpload(e.target.files[0], (data) => {
-        addPaymentMethod(newMethodName || 'Unnamed QR', data);
+      processAndUpload(e.target.files[0], async (data) => {
+        await addPaymentMethod(newMethodName || 'Unnamed QR', data);
         setNewMethodName('');
         if (fileInputRef.current) fileInputRef.current.value = '';
         setIsUploading(false);
@@ -110,8 +112,14 @@ export default function SettingsPage() {
     if (window.confirm('Are you sure you want to end this session? This will clear all players, matches, and courts.')) {
       endSession(currentSession.id);
       toast({ title: 'Session ended' });
-      router.push('/sessions');
+      router.push('/session');
     }
+  };
+
+  const handleEnterSession = (sessionId: string) => {
+    localStorage.setItem('tbc_current_session_id', sessionId);
+    toast({ title: 'Session entered', description: 'You are now in this session' });
+    router.push('/');
   };
 
   return (
@@ -227,9 +235,9 @@ export default function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
-                    <Button 
+                    <Button
                       onClick={handleCopySessionLink}
                       className="w-full font-black uppercase text-[10px] tracking-widest h-10 gap-2"
                       variant="outline"
@@ -244,8 +252,8 @@ export default function SettingsPage() {
                         </>
                       )}
                     </Button>
-                    
-                    <Button 
+
+                    <Button
                       onClick={handleEndSession}
                       className="w-full font-black uppercase text-[10px] tracking-widest h-10"
                       variant="destructive"
@@ -259,13 +267,46 @@ export default function SettingsPage() {
                   <Calendar className="h-12 w-12 mx-auto mb-3 opacity-20" />
                   <p className="text-sm font-black uppercase opacity-40">No active session</p>
                   <p className="text-xs font-bold uppercase mt-1 opacity-30">Create a session to get started</p>
-                  <Button 
+                  <Button
                     onClick={() => router.push('/sessions')}
                     className="mt-4 font-black uppercase text-[10px] tracking-widest h-10"
                     variant="outline"
                   >
                     Go to Sessions
                   </Button>
+                </div>
+              )}
+
+              {/* All Sessions List */}
+              {sessions.filter(s => s.is_active).length > 0 && (
+                <div className="pt-4 border-t">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground mb-3">All Active Sessions</p>
+                  <div className="space-y-2">
+                    {sessions.filter(s => s.is_active).map(session => (
+                      <div
+                        key={session.id}
+                        className={cn(
+                          "p-3 rounded-lg border-2 cursor-pointer transition-all",
+                          currentSession?.id === session.id
+                            ? "bg-primary/10 border-primary"
+                            : "bg-secondary/10 border-secondary/30 hover:border-primary/50"
+                        )}
+                        onClick={() => handleEnterSession(session.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs font-black uppercase">{session.name}</p>
+                            <p className="text-[9px] text-muted-foreground font-bold">
+                              {session.registeredPlayers?.length || 0} players
+                            </p>
+                          </div>
+                          {currentSession?.id === session.id && (
+                            <div className="h-2 w-2 rounded-full bg-green-500" />
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>

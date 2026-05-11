@@ -1,10 +1,13 @@
 import type {Metadata} from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { ClubProvider } from '@/context/ClubContext';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { FirebaseClientProvider } from '@/firebase';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { ClubProvider } from '@/context/ClubContext';
 import { ConditionalHeader } from '@/components/layout/ConditionalHeader';
+import { Toaster } from '@/components/ui/toaster';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'MSW Badminton | Badminton Club',
