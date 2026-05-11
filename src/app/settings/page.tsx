@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
   const {
-    paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
+    players, paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
     autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession,
     sessions
@@ -193,20 +193,6 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-
-          <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
-            <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
-                <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
-              </Button>
-              <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
-                <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
-              </Button>
-            </CardContent>
-          </Card>
         </div>
 
         <div className="space-y-6">
@@ -231,7 +217,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-xs font-black uppercase text-muted-foreground">Players</p>
-                        <p className="text-sm font-black">{currentSession.registeredPlayers?.length || 0}</p>
+                        <p className="text-sm font-black">{players.length}</p>
                       </div>
                     </div>
                   </div>
@@ -297,7 +283,7 @@ export default function SettingsPage() {
                           <div>
                             <p className="text-xs font-black uppercase">{session.name}</p>
                             <p className="text-[9px] text-muted-foreground font-bold">
-                              {session.registeredPlayers?.length || 0} players
+                            {currentSession?.id === session.id ? players.length : session.registeredPlayers?.length || 0} players
                             </p>
                           </div>
                           {currentSession?.id === session.id && (
@@ -358,6 +344,20 @@ export default function SettingsPage() {
             </Card>
         </div>
       </div>
+
+      <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
+        <CardHeader>
+          <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 sm:flex sm:gap-3 sm:space-y-0">
+          <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+            <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
+          </Button>
+          <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
+            <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

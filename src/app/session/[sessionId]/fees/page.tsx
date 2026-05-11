@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Banknote, QrCode, UserCheck, Calculator, Download } from 'lucide-react';
+import { Banknote, QrCode, UserCheck, Calculator, PlusCircle, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+
+type Court = { id: number; hours: number; costPerHour: number };
 
 export default function FeesPage() {
   const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer } = useClub();
@@ -22,11 +24,23 @@ export default function FeesPage() {
 
   const [shuttleUnits, setShuttleUnits] = useState(0);
   const [shuttleCostPerUnit, setShuttleCostPerUnit] = useState(0);
-  const [courtCount, setCourtCount] = useState(1);
-  const [courtCostPerHour, setCourtCostPerHour] = useState(0);
-  const [hoursPlayed, setHoursPlayed] = useState(2);
+  const [courts, setCourts] = useState<Court[]>([{ id: 1, hours: 2, costPerHour: 0 }]);
   const [entranceFee, setEntranceFee] = useState(0);
   const [includeEntranceFee, setIncludeEntranceFee] = useState(true);
+
+  const addCourt = () => {
+    setCourts((prev: Court[]) => [...prev, { id: Date.now(), hours: 2, costPerHour: 0 }]);
+  };
+
+  const removeCourt = (id: number) => {
+    setCourts((prev: Court[]) => prev.filter((c: Court) => c.id !== id));
+  };
+
+  const updateCourt = (id: number, field: 'hours' | 'costPerHour', value: number) => {
+    setCourts((prev: Court[]) =>
+      prev.map((c: Court) => (c.id === id ? { ...c, [field]: value } : c))
+    );
+  };
 
   useEffect(() => {
     setToday(new Date().toISOString().split('T')[0]);
@@ -35,12 +49,12 @@ export default function FeesPage() {
   const currentFee = useMemo(() => fees.find(f => f.id === today), [fees, today]);
 
   const shuttleFee = useMemo(() => {
-    return shuttleUnits * shuttleCostPerUnit * hoursPlayed;
-  }, [shuttleUnits, shuttleCostPerUnit, hoursPlayed]);
+    return shuttleUnits * shuttleCostPerUnit;
+  }, [shuttleUnits, shuttleCostPerUnit]);
 
   const courtFee = useMemo(() => {
-    return courtCount * courtCostPerHour * hoursPlayed;
-  }, [courtCount, courtCostPerHour, hoursPlayed]);
+    return courts.reduce((sum: number, c: Court) => sum + c.costPerHour * c.hours, 0);
+  }, [courts]);
 
   const totalFee = useMemo(() => {
     return shuttleFee + courtFee + (includeEntranceFee ? entranceFee : 0);
@@ -77,12 +91,6 @@ export default function FeesPage() {
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
               <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hours Played</Label>
-                  <div className="relative">
-                    <Input type="number" min="0" step="0.5" className="font-black text-lg h-12" value={hoursPlayed} onChange={e => setHoursPlayed(parseFloat(e.target.value) || 0)} />
-                  </div>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Shuttle Units</Label>
@@ -94,7 +102,7 @@ export default function FeesPage() {
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cost per Unit (₱)</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" value={shuttleCostPerUnit} onChange={e => setShuttleCostPerUnit(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={shuttleCostPerUnit} onChange={e => setShuttleCostPerUnit(parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
                 </div>
@@ -104,21 +112,71 @@ export default function FeesPage() {
                     <span className="text-lg font-black text-primary">₱{shuttleFee.toFixed(2)}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Court Count</Label>
-                    <div className="relative">
-                      <Input type="number" min="1" className="font-black text-lg h-12" value={courtCount} onChange={e => setCourtCount(parseFloat(e.target.value) || 1)} />
-                    </div>
+
+                {/* Courts Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Courts</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-[10px] font-black uppercase tracking-widest border-2 gap-1"
+                      onClick={addCourt}
+                    >
+                      <PlusCircle className="h-3 w-3" /> Add Court
+                    </Button>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cost per Court/Hour (₱)</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" value={courtCostPerHour} onChange={e => setCourtCostPerHour(parseFloat(e.target.value) || 0)} />
+                  {courts.map((court: Court, idx: number) => (
+                    <div key={court.id} className="p-3 rounded-xl border-2 bg-secondary/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-muted-foreground">Court {idx + 1}</span>
+                        {courts.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                            onClick={() => removeCourt(court.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Hours</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            className="font-black h-10 text-sm"
+                            value={court.hours}
+                            onChange={e => updateCourt(court.id, 'hours', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Rate/Hour (₱)</Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50 text-xs">₱</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              className="pl-7 font-black h-10 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              value={court.costPerHour}
+                              onChange={e => updateCourt(court.id, 'costPerHour', parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-muted-foreground pt-1">
+                        <span>Subtotal</span>
+                        <span className="text-primary">₱{(court.costPerHour * court.hours).toFixed(2)}</span>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
+
                 <div className="p-3 bg-primary/5 rounded-xl border-2 border-primary/20">
                   <div className="flex justify-between items-center">
                     <span className="text-[10px] font-black uppercase text-muted-foreground">Court Rental Fee</span>
