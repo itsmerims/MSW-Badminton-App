@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { ClubProvider } from '@/context/ClubContext';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { ConditionalHeader } from '@/components/layout/ConditionalHeader';
 
 export const metadata: Metadata = {

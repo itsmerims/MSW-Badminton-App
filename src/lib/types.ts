@@ -3,19 +3,6 @@ export type PlayerStatus = 'available' | 'playing' | 'resting';
 export type CourtStatus = 'available' | 'occupied';
 export type MatchStatus = 'ongoing' | 'completed' | 'cancelled';
 
-export interface Session {
-  id: string
-  sessionDate: string
-  createdAt: Date
-}
-
-export interface SessionParticipation {
-  id: string
-  sessionId: string
-  playerId: string
-  createdAt: Date
-}
-
 export const SKILL_LEVELS_SHORT: Record<number, string> = {
   1: "Beg",
   2: "Adv Beg",

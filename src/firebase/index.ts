@@ -48,3 +48,6 @@ export * from './non-blocking-updates';
 export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';
+
+// Re-export signIn for backward compatibility
+export { initiateEmailSignIn as signIn } from './non-blocking-login';

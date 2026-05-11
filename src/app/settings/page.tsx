@@ -148,61 +148,57 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {!isPlayer && (
-            <Card className="border-2 shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                  <Trophy className="h-4 w-4" /> Gameplay Rules
-                </CardTitle>
-                <CardDescription className="text-[10px] font-bold uppercase">Define scoring & match behavior.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Winning Score</Label>
-                  <Input
-                    type="number"
-                    value={defaultWinningScore}
-                    onChange={(e) => setDefaultWinningScore(parseInt(e.target.value) || 21)}
-                    className="font-black text-lg h-12"
-                  />
-                  <p className="text-[9px] text-muted-foreground uppercase font-bold">This score is automatically applied when marking a winner.</p>
-                </div>
+          <Card className="border-2 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                <Trophy className="h-4 w-4" /> Gameplay Rules
+              </CardTitle>
+              <CardDescription className="text-[10px] font-bold uppercase">Define scoring & match behavior.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Winning Score</Label>
+                <Input
+                  type="number"
+                  value={defaultWinningScore}
+                  onChange={(e) => setDefaultWinningScore(parseInt(e.target.value) || 21)}
+                  className="font-black text-lg h-12"
+                />
+                <p className="text-[9px] text-muted-foreground uppercase font-bold">This score is automatically applied when marking a winner.</p>
+              </div>
 
-                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border-2 border-primary/20">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                      <Zap className="h-5 w-5 fill-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-black uppercase">Auto-Advance Matches</p>
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically move queue to next court</p>
-                    </div>
+              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border-2 border-primary/20">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                    <Zap className="h-5 w-5 fill-primary" />
                   </div>
-                  <Switch
-                    checked={autoAdvanceEnabled}
-                    onCheckedChange={setAutoAdvanceEnabled}
-                    className="data-[state=checked]:bg-primary"
-                  />
+                  <div className="flex-1">
+                    <p className="text-xs font-black uppercase">Auto-Advance Matches</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Automatically move queue to next court</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <Switch
+                  checked={autoAdvanceEnabled}
+                  onCheckedChange={setAutoAdvanceEnabled}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
+            </CardContent>
+          </Card>
 
-          {isAdmin && (
-            <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
-              <CardHeader>
-                <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
-                  <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
-                </Button>
-                <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
-                  <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="border-2 shadow-sm bg-destructive/5 border-destructive/20">
+            <CardHeader>
+              <CardTitle className="text-sm font-black uppercase tracking-widest text-destructive">Danger Zone</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button onClick={handleResetAction} variant="outline" className="w-full font-black uppercase text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                <RefreshCcw className="h-3 w-3 mr-2" /> Reset Daily Board
+              </Button>
+              <Button onClick={handleWipeAction} variant="destructive" className="w-full font-black uppercase text-[10px]">
+                <Trash2 className="h-3 w-3 mr-2" /> Wipe All Club Data
+              </Button>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
@@ -319,7 +315,6 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
-          )}
         </div>
       </div>
     </div>
