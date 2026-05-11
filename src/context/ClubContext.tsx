@@ -16,6 +16,7 @@ interface ClubContextType {
   currentSession: Session | null;
   defaultWinningScore: number;
   autoAdvanceEnabled: boolean;
+  isPlayer: boolean;
   addPlayer: (player: Omit<Player, 'id' | 'wins' | 'gamesPlayed' | 'partnerHistory' | 'status' | 'improvementScore' | 'totalPlayTimeMinutes' | 'lastAvailableAt'>) => void;
   updatePlayer: (id: string, updates: Partial<Player>) => void;
   deletePlayer: (id: string) => void;
@@ -800,7 +801,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       players: players.filter(p => !p.sessionId || p.sessionId === currentSession?.id),
       courts: courts.filter(c => !c.sessionId || c.sessionId === currentSession?.id),
       matches: matches.filter(m => !m.sessionId || m.sessionId === currentSession?.id),
-      fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled,
+      fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isPlayer: false,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
       addPaymentMethod, deletePaymentMethod, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,

@@ -3,6 +3,7 @@
 
 import { useMemo, useState, useEffect } from 'react';
 import { useClub } from '@/context/ClubContext';
+import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +17,9 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment } = useClub();
+  const { user } = useUser();
+  const isPlayer = !user;
   const [today, setToday] = useState<string>('');
 
   const [shuttleUnits, setShuttleUnits] = useState(0);
