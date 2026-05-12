@@ -120,7 +120,7 @@ export default function SettingsPage() {
   const handleEnterSession = (sessionId: string) => {
     localStorage.setItem('tbc_current_session_id', sessionId);
     toast({ title: 'Session entered', description: 'You are now in this session' });
-    router.push('/');
+    router.push(`/session/${sessionId}`);
   };
 
   const handleRefreshSessions = async () => {
