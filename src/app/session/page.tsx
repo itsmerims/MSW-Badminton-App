@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Play, Users, Clock, Calendar, Check, Share2, Loader2 } from 'lucide-react';
+import { Trash2, Plus, Play, Users, Clock, Calendar, Check, Share2, Loader2, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 export default function SessionsPage() {
-  const { sessions, currentSession, createSession, endSession, getPlayerCountForSession } = useClub();
+  const { sessions, currentSession, createSession, endSession, getPlayerCountForSession, refreshSessionsFromSupabase } = useClub();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -21,6 +21,7 @@ export default function SessionsPage() {
   const [newSessionName, setNewSessionName] = useState('');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const ongoingSessions = sessions.filter(s => s.is_active);
 
@@ -32,6 +33,13 @@ export default function SessionsPage() {
 
     return () => clearTimeout(timer);
   }, [sessions]);
+
+  const handleRefreshSessions = async () => {
+    setIsRefreshing(true);
+    await refreshSessionsFromSupabase();
+    setIsRefreshing(false);
+    toast({ title: 'Sessions refreshed successfully' });
+  };
 
   const handleCreateSession = () => {
     if (!newSessionName.trim()) {
@@ -83,9 +91,21 @@ export default function SessionsPage() {
   return (
     <div className="container mx-auto px-4 py-8 space-y-8 pb-24 max-w-5xl">
       <header className="space-y-1">
-        <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
-          <Calendar className="h-8 w-8 text-primary" /> Sessions
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
+            <Calendar className="h-8 w-8 text-primary" /> Sessions
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 font-black uppercase text-[10px] border-2"
+            onClick={handleRefreshSessions}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-60">Manage badminton sessions</p>
       </header>
 

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { RefreshCcw, Trash2, QrCode, Upload, Loader2, Sun, Moon, Palette, Settings as SettingsIcon, Trophy, Zap, Share2, Calendar, Check } from 'lucide-react';
+import { RefreshCcw, Trash2, QrCode, Upload, Loader2, Sun, Moon, Palette, Settings as SettingsIcon, Trophy, Zap, Share2, Calendar, Check, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -19,7 +19,7 @@ export default function SettingsPage() {
     players, paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
     autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession,
-    sessions
+    sessions, refreshSessionsFromSupabase
   } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const [newMethodName, setNewMethodName] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [copiedSessionLink, setCopiedSessionLink] = useState(false);
+  const [isRefreshingSessions, setIsRefreshingSessions] = useState(false);
 
   const processAndUpload = (file: File, callback: (data: string) => void) => {
     const reader = new FileReader();
@@ -122,6 +123,13 @@ export default function SettingsPage() {
     router.push('/');
   };
 
+  const handleRefreshSessions = async () => {
+    setIsRefreshingSessions(true);
+    await refreshSessionsFromSupabase();
+    setIsRefreshingSessions(false);
+    toast({ title: 'Sessions refreshed successfully' });
+  };
+
   return (
     <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl">
       <header className="space-y-1">
@@ -198,8 +206,19 @@ export default function SettingsPage() {
         <div className="space-y-6">
           <Card className="border-2 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                <Calendar className="h-4 w-4" /> Session
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> Session
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={handleRefreshSessions}
+                  disabled={isRefreshingSessions}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshingSessions ? 'animate-spin' : ''}`} />
+                </Button>
               </CardTitle>
               <CardDescription className="text-[10px] font-bold uppercase">Current active session</CardDescription>
             </CardHeader>

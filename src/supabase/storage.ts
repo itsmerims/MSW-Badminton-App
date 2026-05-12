@@ -190,3 +190,25 @@ export const listQRCodesFromSupabase = async (): Promise<{ id: string; name: str
   console.log('[listQRCodesFromSupabase] Payment methods:', paymentMethods);
   return paymentMethods;
 };
+
+/**
+ * Fetches all sessions from Supabase database.
+ *
+ * @returns Array of session objects.
+ */
+export const getSessionsFromSupabase = async (): Promise<any[]> => {
+  console.log('[getSessionsFromSupabase] Fetching sessions from Supabase');
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[getSessionsFromSupabase] Error fetching sessions:', error);
+    throw new Error(`Failed to fetch sessions: ${error.message}`);
+  }
+
+  console.log('[getSessionsFromSupabase] Sessions fetched:', data?.length);
+  return data || [];
+};

@@ -70,11 +70,9 @@ export default function HomePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentSession = getCurrentSession();
-    if (!currentSession) {
-      router.push('/session');
-    }
-  }, [router, getCurrentSession]);
+    // Always redirect to session page first
+    router.push('/session');
+  }, [router]);
   
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);
   const [winningTeam, setWinningTeam] = useState<{ courtId: string; team: 'teamA' | 'teamB' } | null>(null);

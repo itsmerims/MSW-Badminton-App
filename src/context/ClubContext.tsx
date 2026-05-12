@@ -34,6 +34,7 @@ interface ClubContextType {
   addPaymentMethod: (name: string, imageData: string) => Promise<void>;
   deletePaymentMethod: (id: string) => Promise<void>;
   refreshPaymentMethodsFromSupabase: () => Promise<void>;
+  refreshSessionsFromSupabase: () => Promise<void>;
   setDefaultWinningScore: (score: number) => void;
   setAutoAdvanceEnabled: (enabled: boolean) => void;
   resetDailyBoard: () => void;
@@ -662,6 +663,17 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshSessionsFromSupabase = async () => {
+    try {
+      const { getSessionsFromSupabase } = await import('@/supabase/storage');
+      const supabaseSessions = await getSessionsFromSupabase();
+      setSessions(supabaseSessions);
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(supabaseSessions));
+    } catch (error) {
+      console.error('Failed to refresh sessions from Supabase:', error);
+    }
+  };
+
   const setDefaultWinningScore = (score: number) => {
     setDefaultWinningScoreState(score);
   };
@@ -846,7 +858,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isPlayer: false,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
       startMatch, startTimer, updateMatchScore, endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
-      addPaymentMethod, deletePaymentMethod, refreshPaymentMethodsFromSupabase, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
+      addPaymentMethod, deletePaymentMethod, refreshPaymentMethodsFromSupabase, refreshSessionsFromSupabase, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
       createSession, endSession, getSession, getCurrentSession, registerPlayerForSession, ingestPlayersFromList,
       getPlayerCountForSession: (sessionId: string) => players.filter(p => p.sessionId === sessionId).length,
     }}>
