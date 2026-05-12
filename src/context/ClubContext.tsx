@@ -57,10 +57,9 @@ const STORAGE_KEYS = {
   MATCHES: 'tbc_matches',
   FEES: 'tbc_fees',
   PAYMENT_METHODS: 'tbc_payment_methods',
+  SESSIONS: 'tbc_sessions',
   WINNING_SCORE: 'tbc_winning_score',
   AUTO_ADVANCE: 'tbc_auto_advance',
-  SESSIONS: 'tbc_sessions',
-  CURRENT_SESSION: 'tbc_current_session'
 };
 
 export function ClubProvider({ children }: { children: ReactNode }) {
@@ -87,7 +86,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       setSessions(loadedSessions);
 
       if (loadedSessions.length > 0) {
-        const lastActiveSession = loadedSessions.find((s: Session) => s.is_active) || loadedSessions[loadedSessions.length - 1];
+        const lastActiveSession = loadedSessions.find((s: Session) => s.status === 'active') || loadedSessions[loadedSessions.length - 1];
         setCurrentSession(lastActiveSession);
       }
 
@@ -140,14 +139,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(firebaseSessions));
         }
 
-        // Load current session from Firebase
-        const currentSessionDoc = await getDoc(doc(db, 'current_session', 'active'));
-        if (currentSessionDoc.exists()) {
-          const firebaseCurrentSession = currentSessionDoc.data() as Session;
-          setCurrentSession(firebaseCurrentSession);
-          localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(firebaseCurrentSession));
-        }
-
         // Load payment methods from Firebase
         const paymentMethodsSnapshot = await getDocs(collection(db, 'payment_methods'));
         const firebasePaymentMethods = paymentMethodsSnapshot.docs.map(doc => doc.data() as PaymentMethod);
@@ -191,10 +182,9 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(fees));
     localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(paymentMethods));
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
-    localStorage.setItem(STORAGE_KEYS.CURRENT_SESSION, JSON.stringify(currentSession));
     localStorage.setItem(STORAGE_KEYS.WINNING_SCORE, defaultWinningScore.toString());
     localStorage.setItem(STORAGE_KEYS.AUTO_ADVANCE, JSON.stringify(autoAdvanceEnabled));
-  }, [players, courts, matches, fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
+  }, [players, courts, matches, fees, paymentMethods, sessions, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
 
   // Firebase sync: Local storage is source of truth, Firebase is backup
   useEffect(() => {
@@ -265,11 +255,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
         for (const id of existingSessionIds) {
           await deleteDoc(doc(db, 'sessions', id));
-        }
-
-        // Sync current session
-        if (currentSession) {
-          await setDoc(doc(db, 'current_session', 'active'), currentSession);
         }
 
         // Sync payment methods
@@ -702,7 +687,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       id: sessionId,
       name,
       createdAt: new Date().toISOString(),
-      is_active: true,
+      status: 'active',
       registeredPlayers: []
     };
 
@@ -725,7 +710,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     console.log('[endSession] Ending session:', sessionId);
 
     setSessions(prev => prev.map(s =>
-      s.id === sessionId ? { ...s, is_active: false } : s
+      s.id === sessionId ? { ...s, status: 'closed' } : s
     ));
 
     if (currentSession?.id === sessionId) {

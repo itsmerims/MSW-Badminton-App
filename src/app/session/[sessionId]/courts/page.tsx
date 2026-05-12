@@ -35,7 +35,7 @@ export default function CourtsPage() {
       router.push('/session');
       return;
     }
-    if (!session.is_active) {
+    if (session.status !== 'active') {
       toast({ title: 'Session has ended', variant: 'destructive' });
       router.push('/session');
       return;

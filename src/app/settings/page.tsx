@@ -283,11 +283,11 @@ export default function SettingsPage() {
               )}
 
               {/* All Sessions List */}
-              {sessions.filter(s => s.is_active).length > 0 && (
+              {sessions.filter(s => s.status === 'active').length > 0 && (
                 <div className="pt-4 border-t">
                   <p className="text-[10px] font-black uppercase text-muted-foreground mb-3">All Active Sessions</p>
                   <div className="space-y-2">
-                    {sessions.filter(s => s.is_active).map(session => (
+                    {sessions.filter(s => s.status === 'active').map(session => (
                       <div
                         key={session.id}
                         className={cn(

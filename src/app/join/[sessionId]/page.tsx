@@ -32,7 +32,7 @@ export default function JoinSessionPage({ params }: { params: { sessionId: strin
 
     if (!sessionData) {
       setError('Session not found or has ended');
-    } else if (!sessionData.is_active) {
+    } else if (sessionData.status !== 'active') {
       setError('This session has ended');
     } else {
       setSession(sessionData);

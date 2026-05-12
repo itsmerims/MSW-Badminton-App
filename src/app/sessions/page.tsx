@@ -21,7 +21,7 @@ export default function SessionsPage() {
   const [newSessionName, setNewSessionName] = useState('');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
 
-  const ongoingSessions = sessions.filter(s => s.is_active);
+  const ongoingSessions = sessions.filter(s => s.status === 'active');
 
   const handleCreateSession = () => {
     if (!newSessionName.trim()) {

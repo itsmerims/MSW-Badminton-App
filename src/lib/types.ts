@@ -126,6 +126,6 @@ export interface Session {
   id: string;
   name: string;
   createdAt: string;
-  is_active: boolean;
+  status: 'active' | 'closed';
   registeredPlayers?: SessionRegisteredPlayer[];
 }

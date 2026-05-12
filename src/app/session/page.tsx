@@ -23,7 +23,7 @@ export default function SessionsPage() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const ongoingSessions = sessions.filter(s => s.is_active);
+  const ongoingSessions = sessions.filter(s => s.status === 'active');
 
   useEffect(() => {
     // Simulate loading state for sessions

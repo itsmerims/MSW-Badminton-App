@@ -202,6 +202,7 @@ export const getSessionsFromSupabase = async (): Promise<any[]> => {
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
+    .eq('status', 'active')
     .order('created_at', { ascending: false });
 
   if (error) {
