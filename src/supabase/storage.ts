@@ -128,7 +128,7 @@ export const uploadQRCodeToSupabase = async (
     console.log('[uploadQRCodeToSupabase] Using provided file:', file.name, file.size, file.type);
   }
 
-  const path = `payment-methods/${paymentMethodId}.png`;
+  const path = `payment_method/${paymentMethodId}.png`;
   console.log('[uploadQRCodeToSupabase] Uploading to bucket:', QR_CODE_BUCKET, 'path:', path);
   return uploadFileToSupabase(QR_CODE_BUCKET, path, file);
 };
@@ -139,7 +139,7 @@ export const uploadQRCodeToSupabase = async (
  * @param paymentMethodId The ID of the payment method.
  */
 export const deleteQRCodeFromSupabase = async (paymentMethodId: string): Promise<void> => {
-  const path = `payment-methods/${paymentMethodId}.png`;
+  const path = `payment_method/${paymentMethodId}.png`;
   const { error } = await supabase.storage
     .from(QR_CODE_BUCKET)
     .remove([path]);
@@ -160,7 +160,7 @@ export const listQRCodesFromSupabase = async (): Promise<{ id: string; name: str
 
   const { data, error } = await supabase.storage
     .from(QR_CODE_BUCKET)
-    .list('payment-methods');
+    .list('payment_method');
 
   if (error) {
     console.error('[listQRCodesFromSupabase] Error listing files:', error);
@@ -178,7 +178,7 @@ export const listQRCodesFromSupabase = async (): Promise<{ id: string; name: str
     const id = file.name.replace('.png', '');
     const { data: urlData } = supabase.storage
       .from(QR_CODE_BUCKET)
-      .getPublicUrl(`payment-methods/${file.name}`);
+      .getPublicUrl(`payment_method/${file.name}`);
 
     return {
       id,

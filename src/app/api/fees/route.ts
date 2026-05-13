@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/supabase/client';
+import { db } from '@/firebase/config';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 
 export async function POST(request: Request) {
   try {
@@ -9,16 +10,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing feeId or qrCodeUrl' }, { status: 400 });
     }
 
-    // Store the QR code URL in Supabase storage or database
-    // For now, we'll store it in a Supabase table
-    const { error } = await supabase
-      .from('fee_qr_codes')
-      .upsert({ fee_id: feeId, qr_code_url: qrCodeUrl }, { onConflict: 'fee_id' });
-
-    if (error) {
-      console.error('Supabase error:', error);
-      return NextResponse.json({ error: 'Failed to update QR code URL' }, { status: 500 });
-    }
+    const docRef = doc(db, 'fee_qr_codes', feeId);
+    await setDoc(docRef, { feeId, qrCodeUrl }, { merge: true });
 
     return NextResponse.json({ message: 'Fee QR code updated successfully' });
   } catch (error) {
@@ -36,18 +29,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing feeId' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('fee_qr_codes')
-      .select('qr_code_url')
-      .eq('fee_id', feeId)
-      .single();
+    const docRef = doc(db, 'fee_qr_codes', feeId);
+    const snap = await getDoc(docRef);
 
-    if (error) {
-      console.error('Supabase error:', error);
-      return NextResponse.json({ error: 'Failed to fetch QR code URL' }, { status: 500 });
+    if (!snap.exists()) {
+      return NextResponse.json({ qrCodeUrl: null });
     }
 
-    return NextResponse.json({ qrCodeUrl: data?.qr_code_url || null });
+    return NextResponse.json({ qrCodeUrl: snap.data()?.qrCodeUrl || null });
   } catch (error) {
     console.error('Error fetching fee:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

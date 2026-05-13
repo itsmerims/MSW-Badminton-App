@@ -11,11 +11,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban } from 'lucide-react';
+import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban, Coffee, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { SKILL_LEVELS_SHORT, getSkillColor } from '@/lib/types';
+import { useParams } from 'next/navigation';
 
 function LiveTimer({ startTime }: { startTime?: string }) {
   const [elapsed, setElapsed] = useState('00:00');
@@ -61,20 +62,36 @@ function WaitTimeBadge({ lastAvailableAt }: { lastAvailableAt?: number }) {
 
 export default function HomePage() {
   const router = useRouter();
-  const { getCurrentSession } = useClub();
+  const params = useParams();
+  const urlSessionId = params?.sessionId as string | undefined;
+  const { getSession, selectSession } = useClub();
   const {
     courts, players, matches, deleteCourt, startMatch, startTimer,
     endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch,
-    updateMatchScore, addCourt, deleteMatch, defaultWinningScore
+    updateMatchScore, addCourt, deleteMatch, defaultWinningScore,
+    setPlayerResting, setPlayerAvailable,
   } = useClub();
   const { toast } = useToast();
 
   useEffect(() => {
-    const currentSession = getCurrentSession();
-    if (!currentSession) {
+    if (!urlSessionId) {
       router.push('/session');
+      return;
     }
-  }, [router, getCurrentSession]);
+    const session = getSession(urlSessionId);
+    if (!session) {
+      // Sessions may still be loading — defer check one tick
+      const timer = setTimeout(() => {
+        const s = getSession(urlSessionId);
+        if (!s) router.push('/session');
+        else selectSession(urlSessionId);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    // Ensure context currentSession matches the URL
+    selectSession(urlSessionId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSessionId]);
   
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);
   const [winningTeam, setWinningTeam] = useState<{ courtId: string; team: 'teamA' | 'teamB' } | null>(null);
@@ -132,6 +149,10 @@ export default function HomePage() {
         return result || (a.lastAvailableAt || 0) - (b.lastAvailableAt || 0);
       });
   }, [players, allDraftedIds, sortOption]);
+
+  const restingPlayers = useMemo(() => {
+    return players.filter(p => p.status === 'resting');
+  }, [players]);
   
   const waitingMatches = useMemo(() => {
     return matches.filter(m => !m.isCompleted && !m.courtId).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -318,10 +339,15 @@ export default function HomePage() {
                 </SelectContent>
               </Select>
               <Badge variant="outline" className="font-black h-7 px-2 text-tiny shrink-0">{sortedAvailablePlayers.length}</Badge>
+              {restingPlayers.length > 0 && (
+                <Badge variant="outline" className="font-black h-7 px-2 text-tiny shrink-0 border-amber-500/50 text-amber-600">
+                  <Coffee className="h-3 w-3 mr-1" />{restingPlayers.length}
+                </Badge>
+              )}
             </div>
           </div>
           <ScrollArea className="flex-1">
-            <div className="p-2 grid grid-cols-2 gap-2 pb-24">
+            <div className="p-2 grid grid-cols-2 gap-2 pb-4">
               {sortedAvailablePlayers.map((player) => (
                 <Card 
                   key={player.id} 
@@ -339,12 +365,56 @@ export default function HomePage() {
                     </Badge>
                     <span className="text-[10px] font-black shrink-0">{player.gamesPlayed} G</span>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 w-full h-6 text-[9px] font-black uppercase tracking-widest text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 gap-1"
+                    onClick={() => setPlayerResting(player.id)}
+                  >
+                    <Coffee className="h-3 w-3" /> Rest
+                  </Button>
                 </Card>
               ))}
               {sortedAvailablePlayers.length === 0 && (
-                <div className="col-span-2 py-20 text-center text-muted-foreground font-bold italic opacity-20 text-compact">Bench Empty</div>
+                <div className="col-span-2 py-10 text-center text-muted-foreground font-bold italic opacity-20 text-compact">Bench Empty</div>
               )}
             </div>
+
+            {/* Resting Players */}
+            {restingPlayers.length > 0 && (
+              <div className="px-2 pb-24">
+                <div className="flex items-center gap-2 py-2">
+                  <Coffee className="h-3 w-3 text-amber-500" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Resting ({restingPlayers.length})</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {restingPlayers.map((player) => (
+                    <Card
+                      key={player.id}
+                      className="p-3 border-2 border-amber-500/30 bg-amber-500/5 min-w-0"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="font-black text-compact truncate flex-1 leading-tight text-muted-foreground">{player.name}</span>
+                      </div>
+                      <div className="flex justify-between items-center opacity-60 gap-1">
+                        <Badge variant="outline" className={cn("text-[9px] font-black uppercase h-4 px-1.5 truncate", getSkillColor(player.skillLevel))}>
+                          {SKILL_LEVELS_SHORT[player.skillLevel]}
+                        </Badge>
+                        <span className="text-[10px] font-black shrink-0">{player.gamesPlayed} G</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 w-full h-6 text-[9px] font-black uppercase tracking-widest text-green-600 hover:bg-green-500/10 hover:text-green-700 gap-1"
+                        onClick={() => setPlayerAvailable(player.id)}
+                      >
+                        <CheckCircle2 className="h-3 w-3" /> Available
+                      </Button>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </ScrollArea>
         </div>
 

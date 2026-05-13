@@ -1,12 +1,13 @@
 'use client'
 
-import { signOut } from '@/lib/supabase/auth'
+import { getAuth, signOut } from 'firebase/auth'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 
 export function LogoutButton() {
   const handleLogout = async () => {
-    await signOut()
+    const auth = getAuth()
+    await signOut(auth)
     window.location.href = '/login'
   }
 

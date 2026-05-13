@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useClub } from '@/context/ClubContext';
 import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -16,7 +16,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
-type Court = { id: number; hours: number; costPerHour: number };
+type Court = { id: number; name: string; hours: number; costPerHour: number };
+
+/** Number input helpers: clear "0" on focus, restore 0 on empty blur */
+const numInputProps = (value: number, setValue: (v: number) => void) => ({
+  value: value === 0 ? '' : value,
+  onFocus: (e: React.FocusEvent<HTMLInputElement>) => { if (value === 0) e.target.value = ''; },
+  onBlur: (e: React.FocusEvent<HTMLInputElement>) => { if (e.target.value === '') setValue(0); },
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValue(parseFloat(e.target.value) || 0),
+});
 
 function QRImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [isLoading, setIsLoading] = useState(true);
@@ -51,25 +59,45 @@ function QRImage({ src, alt, className }: { src: string; alt: string; className?
 }
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer, refreshPaymentMethodsFromSupabase } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer, refreshPaymentMethodsFromSupabase, currentSession, saveSessionFee, saveCalculatorData } = useClub();
   const [today, setToday] = useState<string>('');
   const [isRefreshingQR, setIsRefreshingQR] = useState(false);
+  const [isSavingToSession, setIsSavingToSession] = useState(false);
 
   const [shuttleUnits, setShuttleUnits] = useState(0);
   const [shuttleCostPerUnit, setShuttleCostPerUnit] = useState(0);
-  const [courts, setCourts] = useState<Court[]>([{ id: 1, hours: 2, costPerHour: 0 }]);
+  const [courts, setCourts] = useState<Court[]>([{ id: 1, name: 'Court 1', hours: 2, costPerHour: 0 }]);
   const [entranceFee, setEntranceFee] = useState(0);
   const [includeEntranceFee, setIncludeEntranceFee] = useState(true);
+  const [calcLoaded, setCalcLoaded] = useState(false);
+
+  // Load persisted calculator data from current session
+  useEffect(() => {
+    if (calcLoaded) return;
+    const cd = currentSession?.calculatorData;
+    if (cd) {
+      setShuttleUnits(cd.shuttleUnits);
+      setShuttleCostPerUnit(cd.shuttleCostPerUnit);
+      // Migrate legacy court objects that may be missing the name field
+      setCourts(cd.courts.map((c, i) => ({ ...c, name: c.name || `Court ${i + 1}` })));
+      setEntranceFee(cd.entranceFee);
+      setIncludeEntranceFee(cd.includeEntranceFee);
+    }
+    setCalcLoaded(true);
+  }, [currentSession, calcLoaded]);
 
   const addCourt = () => {
-    setCourts((prev: Court[]) => [...prev, { id: Date.now(), hours: 2, costPerHour: 0 }]);
+    setCourts((prev: Court[]) => {
+      const next = prev.length + 1;
+      return [...prev, { id: Date.now(), name: `Court ${next}`, hours: 2, costPerHour: 0 }];
+    });
   };
 
   const removeCourt = (id: number) => {
     setCourts((prev: Court[]) => prev.filter((c: Court) => c.id !== id));
   };
 
-  const updateCourt = (id: number, field: 'hours' | 'costPerHour', value: number) => {
+  const updateCourt = (id: number, field: 'name' | 'hours' | 'costPerHour', value: string | number) => {
     setCourts((prev: Court[]) =>
       prev.map((c: Court) => (c.id === id ? { ...c, [field]: value } : c))
     );
@@ -78,6 +106,27 @@ export default function FeesPage() {
   useEffect(() => {
     setToday(new Date().toISOString().split('T')[0]);
   }, []);
+
+  // Auto-save calculator data to Firestore (debounced 1s)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!calcLoaded) return; // Don't save during initial load
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveCalculatorData({
+        shuttleUnits,
+        shuttleCostPerUnit,
+        courts,
+        entranceFee,
+        includeEntranceFee,
+        numPlayers: players.length,
+      });
+    }, 1000);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [shuttleUnits, shuttleCostPerUnit, courts, entranceFee, includeEntranceFee, players.length, calcLoaded]);
+
+  // Load persisted per-player fee from current session
+  const sessionPerPlayerFee = currentSession?.perPlayerFee;
 
   const currentFee = useMemo(() => fees.find(f => f.id === today), [fees, today]);
 
@@ -121,6 +170,27 @@ export default function FeesPage() {
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+        {/* Session Board Summary - shown when fee is applied */}
+        {!isPlayer && sessionPerPlayerFee != null && (
+          <Card className="lg:col-span-12 border-2 border-green-500/30 shadow-lg bg-green-500/5 overflow-hidden">
+            <CardContent className="py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Banknote className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Session Board Fee</p>
+                  <p className="text-2xl font-black text-green-600">₱{sessionPerPlayerFee.toFixed(2)} <span className="text-sm opacity-60">/ player</span></p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Players</p>
+                <p className="text-lg font-black">{players.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {!isPlayer && (
           <Card className="lg:col-span-5 border-2 shadow-lg bg-card overflow-hidden">
             <CardHeader className="bg-primary/5 border-b">
@@ -134,14 +204,14 @@ export default function FeesPage() {
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Shuttle Units</Label>
                     <div className="relative">
-                      <Input type="number" min="0" className="font-black text-lg h-12" value={shuttleUnits} onChange={e => setShuttleUnits(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="font-black text-lg h-12" placeholder="0" {...numInputProps(shuttleUnits, setShuttleUnits)} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cost per Unit (₱)</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={shuttleCostPerUnit} onChange={e => setShuttleCostPerUnit(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" placeholder="0" {...numInputProps(shuttleCostPerUnit, setShuttleCostPerUnit)} />
                     </div>
                   </div>
                 </div>
@@ -168,8 +238,15 @@ export default function FeesPage() {
                   </div>
                   {courts.map((court: Court, idx: number) => (
                     <div key={court.id} className="p-3 rounded-xl border-2 bg-secondary/20 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-black uppercase text-muted-foreground">Court {idx + 1}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          type="text"
+                          value={court.name}
+                          onChange={(e) => updateCourt(court.id, 'name', e.target.value)}
+                          onBlur={(e) => { if (!e.target.value.trim()) updateCourt(court.id, 'name', `Court ${idx + 1}`); }}
+                          className="text-[10px] font-black uppercase tracking-widest text-muted-foreground bg-transparent border-none outline-none focus:ring-1 focus:ring-primary/40 rounded px-1 w-full min-w-0"
+                          placeholder={`Court ${idx + 1}`}
+                        />
                         {courts.length > 1 && (
                           <Button
                             type="button"
@@ -190,8 +267,8 @@ export default function FeesPage() {
                             min="0"
                             step="0.5"
                             className="font-black h-10 text-sm"
-                            value={court.hours}
-                            onChange={e => updateCourt(court.id, 'hours', parseFloat(e.target.value) || 0)}
+                            placeholder="0"
+                            {...numInputProps(court.hours, (v) => updateCourt(court.id, 'hours', v))}
                           />
                         </div>
                         <div className="space-y-1">
@@ -202,8 +279,8 @@ export default function FeesPage() {
                               type="number"
                               min="0"
                               className="pl-7 font-black h-10 text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              value={court.costPerHour}
-                              onChange={e => updateCourt(court.id, 'costPerHour', parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              {...numInputProps(court.costPerHour, (v) => updateCourt(court.id, 'costPerHour', v))}
                             />
                           </div>
                         </div>
@@ -229,7 +306,7 @@ export default function FeesPage() {
                   </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                    <Input type="number" disabled={!includeEntranceFee} className="pl-8 font-black text-lg h-12 disabled:opacity-30" value={entranceFee} onChange={e => setEntranceFee(parseFloat(e.target.value) || 0)} />
+                    <Input type="number" disabled={!includeEntranceFee} className="pl-8 font-black text-lg h-12 disabled:opacity-30" placeholder="0" {...numInputProps(entranceFee, setEntranceFee)} />
                   </div>
                 </div>
               </div>
@@ -242,10 +319,26 @@ export default function FeesPage() {
                 <Banknote className="h-10 w-10 opacity-30" />
               </div>
             </CardContent>
-            <CardFooter>
-              <Button className="w-full h-12 font-black uppercase tracking-widest" onClick={() => updateFee({ id: today, shuttleFee, courtFee, entranceFee: includeEntranceFee ? entranceFee : 0 })}>
-                Apply to Today's Board
-              </Button>
+            <CardFooter className="flex flex-col gap-2">
+              {currentSession && (
+                <Button
+                  className="w-full h-12 font-black uppercase tracking-widest"
+                  disabled={isSavingToSession}
+                  onClick={async () => {
+                    setIsSavingToSession(true);
+                    try {
+                      await saveSessionFee(parseFloat(perPlayerFee));
+                    } catch (e) {
+                      console.error('Failed to save session fee:', e);
+                    } finally {
+                      setIsSavingToSession(false);
+                    }
+                  }}
+                >
+                  {isSavingToSession ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Apply to Session Board
+                </Button>
+              )}
             </CardFooter>
           </Card>
         )}

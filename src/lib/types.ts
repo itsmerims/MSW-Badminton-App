@@ -1,7 +1,8 @@
 
-export type PlayerStatus = 'available' | 'playing' | 'resting';
+export type PlayerStatus = 'available' | 'in-queue' | 'playing' | 'resting';
 export type CourtStatus = 'available' | 'occupied';
 export type MatchStatus = 'ongoing' | 'completed' | 'cancelled';
+export type SessionStatus = 'active' | 'completed' | 'closed';
 
 export const SKILL_LEVELS_SHORT: Record<number, string> = {
   1: "Beg",
@@ -73,6 +74,7 @@ export interface Player {
   totalPlayTimeMinutes: number;
   lastAvailableAt?: number;
   sessionId?: string;
+  sessionIds?: string[];
 }
 
 export interface Court {
@@ -126,6 +128,15 @@ export interface Session {
   id: string;
   name: string;
   createdAt: string;
-  status: 'active' | 'closed';
+  status: SessionStatus;
   registeredPlayers?: SessionRegisteredPlayer[];
+  perPlayerFee?: number;
+  calculatorData?: {
+    shuttleUnits: number;
+    shuttleCostPerUnit: number;
+    courts: Array<{ id: number; name: string; hours: number; costPerHour: number }>;
+    entranceFee: number;
+    includeEntranceFee: boolean;
+    numPlayers: number;
+  };
 }

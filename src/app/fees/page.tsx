@@ -16,6 +16,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 
+/** Number input helpers: clear "0" on focus, restore 0 on empty blur */
+const numInputProps = (value: number, setValue: (v: number) => void) => ({
+  value: value === 0 ? '' : value,
+  onFocus: (e: React.FocusEvent<HTMLInputElement>) => { if (value === 0) e.target.value = ''; },
+  onBlur: (e: React.FocusEvent<HTMLInputElement>) => { if (e.target.value === '') setValue(0); },
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValue(parseFloat(e.target.value) || 0),
+});
+
 function QRImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -49,11 +57,12 @@ function QRImage({ src, alt, className }: { src: string; alt: string; className?
 }
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, refreshPaymentMethodsFromSupabase } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment, refreshPaymentMethodsFromSupabase, currentSession, saveSessionFee } = useClub();
   const { user } = useUser();
   const isPlayer = !user;
   const [today, setToday] = useState<string>('');
   const [isRefreshingQR, setIsRefreshingQR] = useState(false);
+  const [isSavingToSession, setIsSavingToSession] = useState(false);
 
   const [shuttleUnits, setShuttleUnits] = useState(0);
   const [shuttleCostPerUnit, setShuttleCostPerUnit] = useState(0);
@@ -62,6 +71,9 @@ export default function FeesPage() {
   const [hoursPlayed, setHoursPlayed] = useState(2);
   const [entranceFee, setEntranceFee] = useState(0);
   const [includeEntranceFee, setIncludeEntranceFee] = useState(true);
+
+  // Load persisted per-player fee from current session
+  const sessionPerPlayerFee = currentSession?.perPlayerFee;
 
   useEffect(() => {
     setToday(new Date().toISOString().split('T')[0]);
@@ -109,6 +121,27 @@ export default function FeesPage() {
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+        {/* Session Board Summary - shown when fee is applied */}
+        {!isPlayer && sessionPerPlayerFee != null && (
+          <Card className="lg:col-span-12 border-2 border-green-500/30 shadow-lg bg-green-500/5 overflow-hidden">
+            <CardContent className="py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Banknote className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Session Board Fee</p>
+                  <p className="text-2xl font-black text-green-600">₱{sessionPerPlayerFee.toFixed(2)} <span className="text-sm opacity-60">/ player</span></p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Players</p>
+                <p className="text-lg font-black">{players.length}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {!isPlayer && (
           <Card className="lg:col-span-5 border-2 shadow-lg bg-card overflow-hidden">
             <CardHeader className="bg-primary/5 border-b">
@@ -121,21 +154,21 @@ export default function FeesPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hours Played</Label>
                   <div className="relative">
-                    <Input type="number" min="0" step="0.5" className="font-black text-lg h-12" value={hoursPlayed} onChange={e => setHoursPlayed(parseFloat(e.target.value) || 0)} />
+                    <Input type="number" min="0" step="0.5" className="font-black text-lg h-12" placeholder="0" {...numInputProps(hoursPlayed, setHoursPlayed)} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Shuttle Units</Label>
                     <div className="relative">
-                      <Input type="number" min="0" className="font-black text-lg h-12" value={shuttleUnits} onChange={e => setShuttleUnits(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="font-black text-lg h-12" placeholder="0" {...numInputProps(shuttleUnits, setShuttleUnits)} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cost per Unit (₱)</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" value={shuttleCostPerUnit} onChange={e => setShuttleCostPerUnit(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" placeholder="0" {...numInputProps(shuttleCostPerUnit, setShuttleCostPerUnit)} />
                     </div>
                   </div>
                 </div>
@@ -149,14 +182,14 @@ export default function FeesPage() {
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Court Count</Label>
                     <div className="relative">
-                      <Input type="number" min="1" className="font-black text-lg h-12" value={courtCount} onChange={e => setCourtCount(parseFloat(e.target.value) || 1)} />
+                      <Input type="number" min="1" className="font-black text-lg h-12" placeholder="1" {...numInputProps(courtCount, setCourtCount)} />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Cost per Court/Hour (₱)</Label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" value={courtCostPerHour} onChange={e => setCourtCostPerHour(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" min="0" className="pl-8 font-black text-lg h-12" placeholder="0" {...numInputProps(courtCostPerHour, setCourtCostPerHour)} />
                     </div>
                   </div>
                 </div>
@@ -173,7 +206,7 @@ export default function FeesPage() {
                   </div>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-muted-foreground/50">₱</span>
-                    <Input type="number" disabled={!includeEntranceFee} className="pl-8 font-black text-lg h-12 disabled:opacity-30" value={entranceFee} onChange={e => setEntranceFee(parseFloat(e.target.value) || 0)} />
+                    <Input type="number" disabled={!includeEntranceFee} className="pl-8 font-black text-lg h-12 disabled:opacity-30" placeholder="0" {...numInputProps(entranceFee, setEntranceFee)} />
                   </div>
                 </div>
               </div>
@@ -186,10 +219,26 @@ export default function FeesPage() {
                 <Banknote className="h-10 w-10 opacity-30" />
               </div>
             </CardContent>
-            <CardFooter>
-              <Button className="w-full h-12 font-black uppercase tracking-widest" onClick={() => updateFee({ id: today, shuttleFee, courtFee, entranceFee: includeEntranceFee ? entranceFee : 0 })}>
-                Apply to Today's Board
-              </Button>
+            <CardFooter className="flex flex-col gap-2">
+              {currentSession && (
+                <Button
+                  className="w-full h-12 font-black uppercase tracking-widest"
+                  disabled={isSavingToSession}
+                  onClick={async () => {
+                    setIsSavingToSession(true);
+                    try {
+                      await saveSessionFee(parseFloat(perPlayerFee));
+                    } catch (e) {
+                      console.error('Failed to save session fee:', e);
+                    } finally {
+                      setIsSavingToSession(false);
+                    }
+                  }}
+                >
+                  {isSavingToSession ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Apply to Session Board
+                </Button>
+              )}
             </CardFooter>
           </Card>
         )}

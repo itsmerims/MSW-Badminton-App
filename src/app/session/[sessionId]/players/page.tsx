@@ -22,7 +22,7 @@ function StatusBadge({ status }: { status: string }) {
   const colors = {
     available: "bg-green-500 text-white",
     playing: "bg-primary text-white animate-pulse",
-    resting: "bg-muted text-muted-foreground"
+    "in-queue": "bg-yellow-500 text-white"
   };
   return (
     <Badge className={cn("text-[9px] font-black uppercase tracking-widest h-4 px-1.5 shrink-0", colors[status as keyof typeof colors])}>
@@ -34,8 +34,8 @@ function StatusBadge({ status }: { status: string }) {
 export default function PlayersPage() {
   const { sessionId } = useParams();
   const router = useRouter();
-  const { sessions } = useClub();
-  const { players, addPlayer, updatePlayer, deletePlayer } = useClub();
+  const { sessions, currentSession } = useClub();
+  const { players, addPlayer, updatePlayer, deletePlayer, importPlayerToSession } = useClub();
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,22 +75,39 @@ export default function PlayersPage() {
     }));
   }, [players]);
 
-  const handleAddPlayerAction = () => {
+  const handleAddPlayerAction = async () => {
     const trimmedName = newName.trim();
     if (!trimmedName) return;
-    const isDuplicate = players.some(p => p.name.toLowerCase() === trimmedName.toLowerCase());
-    if (isDuplicate) {
-      toast({ title: "Duplicate Name", description: "A player with this name already exists.", variant: "destructive" });
+
+    // Check if a player with this name already exists in the ENTIRE player DB
+    // (the context exposes only current-session players, so we check by looking
+    // at the filtered list — but the ingest path searches all players internally).
+    const existingInSession = players.find(
+      p => p.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existingInSession) {
+      // Player is already visible in this session's roster — ensure sessionId is
+      // formally assigned so they appear even after a refresh.
+      if (currentSession?.id) {
+        await importPlayerToSession(existingInSession.id, currentSession.id);
+      }
+      setNewName('');
+      inputRef.current?.focus();
+      toast({ title: 'Already in roster', description: `${existingInSession.name} is already registered for this session.` });
       return;
     }
+
+    // No match in the current session view → create a fresh player assigned to
+    // this session (addPlayer always attaches currentSession.id).
     addPlayer({ name: trimmedName, skillLevel: parseInt(newSkill) });
     setNewName('');
     inputRef.current?.focus();
-    toast({ title: "Player Added" });
+    toast({ title: 'Player Added' });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleAddPlayerAction();
+    if (e.key === 'Enter') void handleAddPlayerAction();
   };
 
   const handleEditPlayerAction = () => {

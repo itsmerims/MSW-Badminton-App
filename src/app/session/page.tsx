@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Trash2, Plus, Play, Users, Clock, Calendar, Check, Share2, Loader2, RefreshCw } from 'lucide-react';
+import { Trash2, Plus, Play, Users, Clock, Calendar, Check, Share2, Loader2, RefreshCw, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 export default function SessionsPage() {
-  const { sessions, currentSession, createSession, endSession, getPlayerCountForSession, refreshSessionsFromSupabase } = useClub();
+  const { sessions, currentSession, createSession, endSession, restoreSession, getPlayerCountForSession, refreshSessionsFromSupabase, selectSession } = useClub();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -24,6 +24,7 @@ export default function SessionsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const ongoingSessions = sessions.filter(s => s.status === 'active');
+  const completedSessions = sessions.filter(s => s.status === 'completed');
 
   useEffect(() => {
     // Simulate loading state for sessions
@@ -72,8 +73,17 @@ export default function SessionsPage() {
     }
   };
 
+  const handleRestoreSession = async (sessionId: string) => {
+    try {
+      await restoreSession(sessionId);
+      toast({ title: 'Session restored', description: 'Session is now active again' });
+    } catch (e: any) {
+      toast({ title: 'Failed to restore session', description: e.message, variant: 'destructive' });
+    }
+  };
+
   const handleEnterSession = (sessionId: string) => {
-    localStorage.setItem('tbc_current_session_id', sessionId);
+    selectSession(sessionId);
     toast({ title: 'Session entered', description: 'You are now in this session' });
     router.push(`/session/${sessionId}`);
   };
@@ -234,6 +244,38 @@ export default function SessionsPage() {
           </>
         )}
       </div>
+
+      {/* Completed Sessions History */}
+      {completedSessions.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+            <Clock className="h-5 w-5 text-muted-foreground" /> Session History
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {completedSessions.map(session => (
+              <Card key={session.id} className="border-2 border-dashed bg-muted/30 opacity-70 hover:opacity-100 transition-all">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-black uppercase tracking-tight truncate">{session.name}</CardTitle>
+                  <CardDescription className="text-[10px] font-bold uppercase">
+                    {formatDate(session.createdAt)} • Completed
+                    {session.perPlayerFee != null && ` • ₱${session.perPlayerFee.toFixed(2)}/player`}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button
+                    onClick={() => handleRestoreSession(session.id)}
+                    className="w-full font-black uppercase text-[10px] tracking-widest h-9 gap-2"
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RotateCcw className="h-3 w-3" /> Restore Session
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
