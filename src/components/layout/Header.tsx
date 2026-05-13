@@ -34,10 +34,19 @@ export default function Header() {
   const navItems = [
     { label: 'Dashboard', href: currentSession ? `/session/${currentSession.id}` : '/', icon: LayoutDashboard },
     { label: 'Players', href: currentSession ? `/session/${currentSession.id}/players` : '/players', icon: Users },
+    { label: 'Matches', href: currentSession ? `/session/${currentSession.id}/matches` : '/matches', icon: Swords },
     { label: 'Rankings', href: '/rankings', icon: Trophy },
     { label: 'Fees', href: currentSession ? `/session/${currentSession.id}/fees` : '/fees', icon: Banknote },
     { label: 'Settings', href: '/settings', icon: Settings },
   ];
+
+  // Check if we're on a session page (dashboard)
+  const isSessionPage = pathname?.startsWith('/session/') && pathname !== '/session' && !pathname?.includes('/players') && !pathname?.includes('/fees') && !pathname?.includes('/courts');
+
+  // Filter navItems for session page - show Rankings, Matches, and Settings
+  const filteredNavItems = isSessionPage
+    ? navItems.filter(item => item.label === 'Rankings' || item.label === 'Matches' || item.label === 'Settings')
+    : navItems;
 
   const handleQuickMatch = async () => {
     const availablePlayers = players.filter((p: Player) => p.status === 'available');
@@ -95,7 +104,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1 ml-6 border-l pl-6">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link key={item.href} href={item.href}>
@@ -126,96 +135,100 @@ export default function Header() {
             {theme === 'dark' ? <Sun className="h-4 w-4 md:h-5 md:w-5" /> : <Moon className="h-4 w-4 md:h-5 md:w-5" />}
           </Button>
 
-          <Button onClick={handleQuickMatch} className="md:hidden h-9 w-9 p-0 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
-            <Zap className="h-4 w-4 fill-white" />
-          </Button>
-
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9 md:h-10 md:w-10 border-2 hover:bg-secondary"
-            onClick={() => {
-              addCourt();
-              toast({ title: "Court Added" });
-            }}
-          >
-            <Plus className="h-4 w-4 md:h-5 md:w-5" />
-          </Button>
-
-          <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="md:hidden h-9 w-9 p-0 border-2 hover:bg-secondary">
-                <Swords className="h-4 w-4" />
+          {!isSessionPage && (
+            <>
+              <Button onClick={handleQuickMatch} className="md:hidden h-9 w-9 p-0 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                <Zap className="h-4 w-4 fill-white" />
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle className="text-lg font-black uppercase">Manual Match Selection</DialogTitle></DialogHeader>
-              <div className="space-y-6 py-6">
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest">Target Court</Label>
-                  <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
-                    <SelectTrigger className="h-12 font-bold"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="queue" className="font-bold">Send to Queue</SelectItem>
-                      {courts.filter(c => c.status === 'available').map(c => (
-                        <SelectItem key={c.id} value={c.id} className="font-bold">{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase tracking-widest">Select 4 Players</Label>
-                  <ScrollArea className="h-48 border rounded-lg p-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 md:h-10 md:w-10 border-2 hover:bg-secondary"
+                onClick={() => {
+                  addCourt();
+                  toast({ title: "Court Added" });
+                }}
+              >
+                <Plus className="h-4 w-4 md:h-5 md:w-5" />
+              </Button>
+
+              <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="md:hidden h-9 w-9 p-0 border-2 hover:bg-secondary">
+                    <Swords className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader><DialogTitle className="text-lg font-black uppercase">Manual Match Selection</DialogTitle></DialogHeader>
+                  <div className="space-y-6 py-6">
                     <div className="space-y-2">
-                      {players.filter((p: Player) => p.status === 'available').map((player) => (
-                        <div key={player.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary/50">
-                          <Checkbox
-                            id={player.id}
-                            checked={selectedPlayerIds.includes(player.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                if (selectedPlayerIds.length < 4) setSelectedPlayerIds([...selectedPlayerIds, player.id]);
-                              } else {
-                                setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.id));
-                              }
-                            }}
-                          />
-                          <label htmlFor={player.id} className="flex-1 text-xs font-bold truncate cursor-pointer">
-                            {player.name}
-                          </label>
-                          <Badge variant="outline" className={cn("text-[9px] h-4 px-1.5", getSkillColor(player.skillLevel))}>
-                            {SKILL_LEVELS_SHORT[player.skillLevel]}
-                          </Badge>
-                        </div>
-                      ))}
+                      <Label className="text-xs font-black uppercase tracking-widest">Target Court</Label>
+                      <Select value={selectedCourtId} onValueChange={setSelectedCourtId}>
+                        <SelectTrigger className="h-12 font-bold"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="queue" className="font-bold">Send to Queue</SelectItem>
+                          {courts.filter(c => c.status === 'available').map(c => (
+                            <SelectItem key={c.id} value={c.id} className="font-bold">{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  </ScrollArea>
-                </div>
 
-                <Button
-                  className="w-full font-black uppercase h-16 text-base shadow-xl shadow-primary/20"
-                  disabled={selectedPlayerIds.length !== 4}
-                  onClick={handleManualMatchSubmit}
-                >
-                  Create Manual Match
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase tracking-widest">Select 4 Players</Label>
+                      <ScrollArea className="h-48 border rounded-lg p-2">
+                        <div className="space-y-2">
+                          {players.filter((p: Player) => p.status === 'available').map((player) => (
+                            <div key={player.id} className="flex items-center gap-2 p-2 rounded hover:bg-secondary/50">
+                              <Checkbox
+                                id={player.id}
+                                checked={selectedPlayerIds.includes(player.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    if (selectedPlayerIds.length < 4) setSelectedPlayerIds([...selectedPlayerIds, player.id]);
+                                  } else {
+                                    setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.id));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={player.id} className="flex-1 text-xs font-bold truncate cursor-pointer">
+                                {player.name}
+                              </label>
+                              <Badge variant="outline" className={cn("text-[9px] h-4 px-1.5", getSkillColor(player.skillLevel))}>
+                                {SKILL_LEVELS_SHORT[player.skillLevel]}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
 
-          <Button onClick={handleQuickMatch} className="hidden md:flex gap-2 bg-primary font-black uppercase text-[10px] tracking-widest h-10 px-4 shadow-lg shadow-primary/20 hover:scale-105 transition-all">
-            <Zap className="h-4 w-4 fill-white" /> Quick
-          </Button>
+                    <Button
+                      className="w-full font-black uppercase h-16 text-base shadow-xl shadow-primary/20"
+                      disabled={selectedPlayerIds.length !== 4}
+                      onClick={handleManualMatchSubmit}
+                    >
+                      Create Manual Match
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
 
-          {/* Desktop: Labeled buttons */}
-          <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="hidden md:flex gap-2 font-black uppercase text-[10px] tracking-widest h-10 border-2 hover:bg-secondary px-4">
-                <Swords className="h-4 w-4" /> Manual
+              <Button onClick={handleQuickMatch} className="hidden md:flex gap-2 bg-primary font-black uppercase text-[10px] tracking-widest h-10 px-4 shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                <Zap className="h-4 w-4 fill-white" /> Quick
               </Button>
-            </DialogTrigger>
-          </Dialog>
+
+              {/* Desktop: Labeled buttons */}
+              <Dialog open={isManualOpen} onOpenChange={setIsManualOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="hidden md:flex gap-2 font-black uppercase text-[10px] tracking-widest h-10 border-2 hover:bg-secondary px-4">
+                    <Swords className="h-4 w-4" /> Manual
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </>
+          )}
 
           {/* Mobile Hamburger Menu */}
           <Button
@@ -235,7 +248,7 @@ export default function Header() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="absolute right-0 top-0 bottom-0 w-64 bg-card shadow-xl animate-in slide-in-from-right">
             <nav className="flex flex-col p-4 space-y-2">
-              {navItems.map((item) => {
+              {filteredNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 return (
                   <Link key={item.href} href={item.href} onClick={() => handleNavClick(item.href)}>
