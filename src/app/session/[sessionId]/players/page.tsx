@@ -80,8 +80,34 @@ export default function PlayersPage() {
     if (!trimmedName) return;
 
     // Check if a player with this name already exists in the ENTIRE player DB
-    // (the context exposes only current-session players, so we check by looking
-    // at the filtered list — but the ingest path searches all players internally).
+    // by querying Firebase directly (not just current session players)
+    try {
+      const { db } = await import('@/firebase/config');
+      const { collection, getDocs, query, where } = await import('firebase/firestore');
+      
+      const playersRef = collection(db, 'players');
+      const q = query(playersRef, where('name', '==', trimmedName));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        // Player exists in database - import to current session
+        const existingPlayer = querySnapshot.docs[0].data() as Player;
+        const existingPlayerId = querySnapshot.docs[0].id;
+        
+        if (currentSession?.id) {
+          await importPlayerToSession(existingPlayerId, currentSession.id);
+          setNewName('');
+          inputRef.current?.focus();
+          toast({ title: 'Player imported', description: `${existingPlayer.name} was imported to this session.` });
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('Error checking existing player:', e);
+      // Continue with local check if Firebase query fails
+    }
+
+    // Fallback: Check if player exists in current session view
     const existingInSession = players.find(
       p => p.name.toLowerCase() === trimmedName.toLowerCase()
     );

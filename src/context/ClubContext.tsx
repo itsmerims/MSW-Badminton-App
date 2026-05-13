@@ -1052,13 +1052,36 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       const displayName = buildDisplayName(fullName);
       const incomingFirst = fullName.trim().split(' ')[0].toLowerCase();
 
-      // 1. Exact match on the computed display name.
-      let existingPlayer = players.find(
-        p => p.name.toLowerCase() === displayName.toLowerCase()
-      );
+      // 1. Check Firebase for existing player by display name
+      let existingPlayer: Player | undefined;
+      let existingPlayerId: string | undefined;
 
-      // 2. When this is the only person with that first name in the batch, also
-      //    try matching by first name alone. This handles the case where the player
+      try {
+        const { db } = await import('@/firebase/config');
+        const { collection, getDocs, query, where } = await import('firebase/firestore');
+        
+        const playersRef = collection(db, 'players');
+        const q = query(playersRef, where('name', '==', displayName));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const playerData = querySnapshot.docs[0].data() as Player;
+          existingPlayerId = querySnapshot.docs[0].id;
+          existingPlayer = { ...playerData, id: existingPlayerId };
+        }
+      } catch (e) {
+        console.error('[ingestPlayersFromList] Error checking Firebase for existing player:', e);
+      }
+
+      // 2. If not found in Firebase, check local state by display name
+      if (!existingPlayer) {
+        existingPlayer = players.find(
+          p => p.name.toLowerCase() === displayName.toLowerCase()
+        );
+      }
+
+      // 3. When this is the only person with that first name in the batch, also
+      //    try matching by first name alone in local state. This handles the case where the player
       //    was previously stored with an initial (e.g. "John B.") because there
       //    was another John at the time — they should be renamed back to "John".
       if (!existingPlayer && (incomingFirstNameCounts[incomingFirst] ?? 0) === 1) {
@@ -1081,14 +1104,17 @@ export function ClubProvider({ children }: { children: ReactNode }) {
             ...new Set([...(existingPlayer.sessionIds || []), currentSession.id]),
           ];
         }
-        updatePlayer(existingPlayer.id, updates);
+        
+        // Use the Firebase ID if we found it there, otherwise use local ID
+        const playerIdToUpdate = existingPlayerId || existingPlayer.id;
+        updatePlayer(playerIdToUpdate, updates);
 
         // Sync the session assignment to Firestore.
         if (currentSession?.id) {
           try {
             const { db } = await import('@/firebase/config');
             const { importPlayerToSession: importFirestore } = await import('@/firebase/firestore/player-service');
-            await importFirestore(db, existingPlayer.id, currentSession.id);
+            await importFirestore(db, playerIdToUpdate, currentSession.id);
           } catch (e) {
             console.error('[ingestPlayersFromList] Firestore session import error:', e);
           }
