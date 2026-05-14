@@ -70,8 +70,8 @@ export default function HomePage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Always redirect to session page first
-    router.push('/session');
+    // Always redirect to sessions page first
+    router.push('/sessions');
   }, [router]);
   
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);

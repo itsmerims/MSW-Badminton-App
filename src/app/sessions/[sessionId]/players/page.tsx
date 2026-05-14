@@ -10,22 +10,24 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, User, TrendingUp, Users, Trash2, Pencil, Search } from 'lucide-react';
+import { Plus, User, TrendingUp, Users, Trash2, Pencil, Search, Check, Clock, Play, FileDown } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Cell } from 'recharts';
-import { SKILL_LEVELS_FULL, SKILL_LEVELS_SHORT, getSkillColor, Player } from '@/lib/types';
+import { SKILL_LEVELS_FULL, SKILL_LEVELS_SHORT, getSkillColor, Player, PlayerStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ListGetter } from '@/components/ingest/ListGetter';
+import { exportPlayersToCSV } from '@/lib/export';
 
 function StatusBadge({ status }: { status: string }) {
   const colors = {
     available: "bg-green-500 text-white",
     playing: "bg-primary text-white animate-pulse",
-    "in-queue": "bg-yellow-500 text-white"
+    "in-queue": "bg-yellow-500 text-white",
+    resting: "bg-gray-500 text-white"
   };
   return (
-    <Badge className={cn("text-[9px] font-black uppercase tracking-widest h-4 px-1.5 shrink-0", colors[status as keyof typeof colors])}>
+    <Badge className={cn("text-[9px] font-black uppercase tracking-widest h-4 px-1.5 shrink-0", colors[status as keyof typeof colors] || colors.available)}>
       {status}
     </Badge>
   );
@@ -75,9 +77,27 @@ export default function PlayersPage() {
     }));
   }, [players]);
 
+  const handleExportPlayers = () => {
+    exportPlayersToCSV(players, sessionId as string);
+  };
+
   const handleAddPlayerAction = async () => {
     const trimmedName = newName.trim();
     if (!trimmedName) return;
+
+    // Parse skill level from name format "Name - X" where X is a number
+    let parsedName = trimmedName;
+    let parsedSkillLevel = parseInt(newSkill);
+    
+    const skillLevelMatch = trimmedName.match(/-(\d+)\s*$/);
+    if (skillLevelMatch) {
+      const skillLevel = parseInt(skillLevelMatch[1]);
+      if (skillLevel >= 1 && skillLevel <= 7) {
+        parsedSkillLevel = skillLevel;
+        // Remove the skill level suffix from the name
+        parsedName = trimmedName.replace(/-\d+\s*$/, '').trim();
+      }
+    }
 
     // Check if a player with this name already exists in the ENTIRE player DB
     // by querying Firebase directly (not just current session players)
@@ -86,7 +106,7 @@ export default function PlayersPage() {
       const { collection, getDocs, query, where } = await import('firebase/firestore');
       
       const playersRef = collection(db, 'players');
-      const q = query(playersRef, where('name', '==', trimmedName));
+      const q = query(playersRef, where('name', '==', parsedName));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
@@ -109,7 +129,7 @@ export default function PlayersPage() {
 
     // Fallback: Check if player exists in current session view
     const existingInSession = players.find(
-      p => p.name.toLowerCase() === trimmedName.toLowerCase()
+      p => p.name.toLowerCase() === parsedName.toLowerCase()
     );
 
     if (existingInSession) {
@@ -126,7 +146,7 @@ export default function PlayersPage() {
 
     // No match in the current session view → create a fresh player assigned to
     // this session (addPlayer always attaches currentSession.id).
-    addPlayer({ name: trimmedName, skillLevel: parseInt(newSkill) });
+    addPlayer({ name: parsedName, skillLevel: parsedSkillLevel });
     setNewName('');
     inputRef.current?.focus();
     toast({ title: 'Player Added' });
@@ -149,6 +169,11 @@ export default function PlayersPage() {
     toast({ title: "Skill Level Updated" });
   };
 
+  const handleStatusChange = (playerId: string, newStatus: PlayerStatus) => {
+    updatePlayer(playerId, { status: newStatus });
+    toast({ title: "Status Updated" });
+  };
+
   return (
     <div className="container mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6 pb-24 max-w-7xl">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0">
@@ -160,14 +185,25 @@ export default function PlayersPage() {
             {players.length} Members
           </p>
         </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search roster..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 text-compact font-bold bg-secondary/20 border-none"
-          />
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search roster..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-9 h-10 text-compact font-bold bg-secondary/20 border-none"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportPlayers}
+            className="h-10 gap-2 border-2 font-black uppercase text-xs shrink-0"
+          >
+            <FileDown className="h-3 w-3" />
+            Export CSV
+          </Button>
         </div>
       </header>
 
@@ -243,7 +279,7 @@ export default function PlayersPage() {
                         <p className="font-black text-compact truncate leading-tight group-hover:text-primary transition-colors">
                           {player.name}
                         </p>
-                        <div className="mt-1">
+                        <div className="mt-1 flex items-center gap-1">
                           <StatusBadge status={player.status} />
                         </div>
                       </div>
@@ -284,6 +320,41 @@ export default function PlayersPage() {
                         <p className="text-[8px] font-black uppercase text-muted-foreground truncate mb-1">Games</p>
                         <p className="text-compact font-black truncate">{player.gamesPlayed}</p>
                       </div>
+                    </div>
+                    {/* Status Change Buttons */}
+                    <div className="flex gap-1 pt-2 border-t border-dashed">
+                      <Button
+                        size="sm"
+                        variant={player.status === 'available' ? 'default' : 'outline'}
+                        className="flex-1 h-6 text-[8px] font-black uppercase"
+                        onClick={() => handleStatusChange(player.id, 'available')}
+                      >
+                        <Check className="h-2.5 w-2.5 mr-0.5" /> Avail
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={player.status === 'in-queue' ? 'default' : 'outline'}
+                        className="flex-1 h-6 text-[8px] font-black uppercase"
+                        onClick={() => handleStatusChange(player.id, 'in-queue')}
+                      >
+                        <Clock className="h-2.5 w-2.5 mr-0.5" /> Queue
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={player.status === 'playing' ? 'default' : 'outline'}
+                        className="flex-1 h-6 text-[8px] font-black uppercase"
+                        onClick={() => handleStatusChange(player.id, 'playing')}
+                      >
+                        <Play className="h-2.5 w-2.5 mr-0.5" /> Play
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={player.status === 'resting' ? 'default' : 'outline'}
+                        className="flex-1 h-6 text-[8px] font-black uppercase"
+                        onClick={() => handleStatusChange(player.id, 'resting')}
+                      >
+                        Rest
+                      </Button>
                     </div>
                     {inlineEditingId === player.id && (
                       <div className="flex gap-1 pt-1">

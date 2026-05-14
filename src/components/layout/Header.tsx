@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Trophy, Banknote, Settings, Plus, Zap, Swords, Sun, Moon, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, Banknote, Settings, Plus, Zap, Swords, Sun, Moon, Menu, X, Undo2, Redo2, BarChart3, Medal, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useClub } from '@/context/ClubContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -23,7 +23,7 @@ import { getSkillColor, SKILL_LEVELS_SHORT } from '@/lib/types';
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const pathname = usePathname();
-  const { players, courts, startMatch, addCourt, currentSession } = useClub();
+  const { players, courts, startMatch, addCourt, currentSession, canUndo, canRedo, undo, redo, isOnline } = useClub();
   const { toast } = useToast();
 
   const [isManualOpen, setIsManualOpen] = useState(false);
@@ -31,20 +31,38 @@ export default function Header() {
   const [selectedCourtId, setSelectedCourtId] = useState<string>('queue');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (canUndo) undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, undo, redo]);
+
   const navItems = [
-    { label: 'Dashboard', href: currentSession ? `/session/${currentSession.id}` : '/', icon: LayoutDashboard },
-    { label: 'Players', href: currentSession ? `/session/${currentSession.id}/players` : '/players', icon: Users },
-    { label: 'Matches', href: currentSession ? `/session/${currentSession.id}/matches` : '/matches', icon: Swords },
-    { label: 'Rankings', href: '/rankings', icon: Trophy },
-    { label: 'Fees', href: currentSession ? `/session/${currentSession.id}/fees` : '/fees', icon: Banknote },
-    { label: 'Settings', href: '/settings', icon: Settings },
+    { label: 'Dashboard', href: currentSession ? `/sessions/${currentSession.id}` : '/', icon: LayoutDashboard },
+    { label: 'Players', href: currentSession ? `/sessions/${currentSession.id}/players` : '/players', icon: Users },
+    { label: 'Matches', href: currentSession ? `/sessions/${currentSession.id}/matches` : '/matches', icon: Swords },
+    { label: 'Statistics', href: currentSession ? `/sessions/${currentSession.id}/statistics` : '/statistics', icon: BarChart3 },
+    { label: 'Tournament', href: currentSession ? `/sessions/${currentSession.id}/tournament` : '/tournament', icon: Medal },
+    { label: 'Rankings', href: currentSession ? `/sessions/${currentSession.id}/rankings` : '/rankings', icon: Trophy },
+    { label: 'Fees', href: currentSession ? `/sessions/${currentSession.id}/fees` : '/fees', icon: Banknote },
+    { label: 'Settings', href: currentSession ? `/sessions/${currentSession.id}/settings` : '/settings', icon: Settings },
   ];
 
-  // Check if we're on a session page (dashboard)
-  const isSessionPage = pathname?.startsWith('/session/') && pathname !== '/session' && !pathname?.includes('/players') && !pathname?.includes('/fees') && !pathname?.includes('/courts');
+  // Check if we're on the sessions list page
+  const isSessionsListPage = pathname === '/sessions';
 
-  // Filter navItems for session page - show Rankings, Matches, and Settings
-  const filteredNavItems = isSessionPage
+  // Filter navItems for sessions list page - only show Rankings and Settings
+  const filteredNavItems = isSessionsListPage
     ? navItems.filter(item => item.label === 'Rankings' || item.label === 'Matches' || item.label === 'Settings')
     : navItems;
 
@@ -129,13 +147,44 @@ export default function Header() {
           <Button
             variant="ghost"
             size="icon"
+            className="h-9 w-9 md:h-10 md:w-10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 md:h-10 md:w-10 text-muted-foreground hover:text-primary transition-colors disabled:opacity-30"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-9 w-9 md:h-10 md:w-10 text-muted-foreground hover:text-primary transition-colors"
             onClick={toggleTheme}
           >
             {theme === 'dark' ? <Sun className="h-4 w-4 md:h-5 md:w-5" /> : <Moon className="h-4 w-4 md:h-5 md:w-5" />}
           </Button>
+          
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/30 border-2 border-border">
+            {isOnline ? (
+              <Wifi className="h-3 w-3 text-green-500" />
+            ) : (
+              <WifiOff className="h-3 w-3 text-orange-500" />
+            )}
+            <span className="text-[10px] font-black uppercase hidden md:inline">
+              {isOnline ? 'Online' : 'Offline'}
+            </span>
+          </div>
 
-          {!isSessionPage && (
+          {!isSessionsListPage && (
             <>
               <Button onClick={handleQuickMatch} className="md:hidden h-9 w-9 p-0 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-all">
                 <Zap className="h-4 w-4 fill-white" />

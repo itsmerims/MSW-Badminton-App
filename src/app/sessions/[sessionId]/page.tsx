@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban, Coffee, CheckCircle2 } from 'lucide-react';
+import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban, Coffee, CheckCircle2, Pencil } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -69,7 +69,7 @@ export default function HomePage() {
     courts, players, matches, deleteCourt, startMatch, startTimer,
     endMatch, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch,
     updateMatchScore, addCourt, deleteMatch, defaultWinningScore,
-    setPlayerResting, setPlayerAvailable,
+    setPlayerResting, setPlayerAvailable, updateCourt,
   } = useClub();
   const { toast } = useToast();
 
@@ -94,8 +94,6 @@ export default function HomePage() {
   }, [urlSessionId]);
   
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);
-  const [winningTeam, setWinningTeam] = useState<{ courtId: string; team: 'teamA' | 'teamB' } | null>(null);
-  const [loserScore, setLoserScore] = useState<string>('');
   const [mounted, setMounted] = useState(false);
   
   const [draftPlayerIds, setDraftPlayerIds] = useState<string[]>([]);
@@ -106,15 +104,10 @@ export default function HomePage() {
   const [isCourtPanelOver, setIsCourtPanelOver] = useState(false);
   
   const [sortOption, setSortOption] = useState<string>('default');
-  const loserScoreInputRef = useRef<HTMLInputElement>(null);
 
-  // Zero-score confirmation state
-  const [pendingMatchFinish, setPendingMatchFinish] = useState<{
-    courtId: string;
-    winner: 'teamA' | 'teamB';
-    scoreA: number;
-    scoreB: number;
-  } | null>(null);
+  // Court editing state
+  const [editingCourt, setEditingCourt] = useState<string | null>(null);
+  const [editCourtName, setEditCourtName] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -266,53 +259,31 @@ export default function HomePage() {
 
   const completeMatch = (courtId: string, winner: 'teamA' | 'teamB', scoreA: number, scoreB: number) => {
     endMatch(courtId, 'completed', winner, scoreA, scoreB);
-    setPendingMatchFinish(null);
-    setWinningTeam(null);
-    setLoserScore('');
     toast({ title: "Match Completed!" });
   };
 
-  const handleFinishMatch = (courtId: string, teamAScore: number, teamBScore: number) => {
-    const validation = validateMatchScore(teamAScore, teamBScore);
-    if (!validation.valid) {
-      toast({ title: "Cannot Finish Match", description: validation.message, variant: "destructive" });
-      return;
-    }
-
-    const winner = teamAScore > teamBScore ? 'teamA' : 'teamB';
-    const loserScoreValue = winner === 'teamA' ? teamBScore : teamAScore;
-
-    if (loserScoreValue === 0) {
-      setPendingMatchFinish({ courtId, winner, scoreA: teamAScore, scoreB: teamBScore });
-    } else {
-      completeMatch(courtId, winner, teamAScore, teamBScore);
-    }
+  const handleEditCourt = (courtId: string, currentName: string) => {
+    setEditingCourt(courtId);
+    setEditCourtName(currentName.replace('Court ', ''));
   };
 
-  const handleWinSubmit = () => {
-    if (!winningTeam) return;
-    const lScore = parseInt(loserScore) || 0;
-    
-    const tAScore = winningTeam.team === 'teamA' ? defaultWinningScore : lScore;
-    const tBScore = winningTeam.team === 'teamB' ? defaultWinningScore : lScore;
-
-    const validation = validateMatchScore(tAScore, tBScore);
-    if (!validation.valid) {
-      toast({ title: "Invalid Score", description: validation.message, variant: "destructive" });
+  const handleSaveCourtName = () => {
+    if (!editingCourt || !editCourtName.trim()) return;
+    const formattedName = `Court ${editCourtName.trim()}`;
+    const isDuplicate = courts.some(c => c.name === formattedName && c.id !== editingCourt);
+    if (isDuplicate) {
+      toast({ title: "Duplicate Court", description: "A court with this name already exists.", variant: "destructive" });
       return;
     }
+    updateCourt(editingCourt, editCourtName.trim());
+    setEditingCourt(null);
+    setEditCourtName('');
+    toast({ title: "Court Name Updated" });
+  };
 
-    const courtId = winningTeam.courtId;
-    const winner = winningTeam.team;
-    
-    // Clear winningTeam dialog first to prevent modal state lock
-    setWinningTeam(null);
-    
-    if (lScore === 0) {
-      setPendingMatchFinish({ courtId, winner, scoreA: tAScore, scoreB: tBScore });
-    } else {
-      completeMatch(courtId, winner, tAScore, tBScore);
-    }
+  const handleCancelEdit = () => {
+    setEditingCourt(null);
+    setEditCourtName('');
   };
 
   return (
@@ -550,8 +521,6 @@ export default function HomePage() {
                 const match = matches.find(m => m.id === court.currentMatchId && !m.isCompleted);
                 const isOver = overCourtId === court.id;
                 const draft = courtDrafts[court.id];
-                const teamAScore = match?.teamAScore || 0;
-                const teamBScore = match?.teamBScore || 0;
                 
                 return (
                   <Card 
@@ -566,10 +535,41 @@ export default function HomePage() {
                     )}
                   >
                     <div className={cn("p-2 px-3 flex justify-between items-center border-b", court.status === 'occupied' ? "bg-primary/5" : "bg-muted/20")}>
-                      <span className="text-compact font-black uppercase truncate max-w-[120px]">{court.name}</span>
-                      <Badge variant={court.status === 'available' ? 'outline' : 'default'} className="text-[9px] font-black uppercase px-2 h-5 shrink-0">
-                        {court.status}
-                      </Badge>
+                      {editingCourt === court.id ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <span className="text-compact font-bold text-muted-foreground bg-secondary px-2 py-1 rounded text-[10px]">Court</span>
+                          <Input
+                            value={editCourtName}
+                            onChange={e => setEditCourtName(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveCourtName()}
+                            className="h-6 text-compact font-bold"
+                            autoFocus
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-compact font-black uppercase truncate max-w-[120px]">{court.name}</span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleEditCourt(court.id, court.name)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:bg-destructive hover:text-white"
+                          onClick={() => deleteCourt(court.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                        <Badge variant={court.status === 'available' ? 'outline' : 'default'} className="text-[9px] font-black uppercase px-2 h-5 shrink-0">
+                          {court.status}
+                        </Badge>
+                      </div>
                     </div>
                     <CardContent className="p-3 flex-1 flex flex-col space-y-3 min-h-0">
                       {court.status === 'occupied' && match ? (
@@ -581,13 +581,9 @@ export default function HomePage() {
                                   size="sm" 
                                   variant="outline" 
                                   className="h-6 text-[8px] font-black px-1.5" 
-                                  disabled={!match.startTime}
                                   onClick={() => {
-                                    if (!match.startTime) {
-                                      toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
-                                      return;
-                                    }
-                                    setWinningTeam({ courtId: court.id, team: 'teamA' });
+                                    endMatch(court.id, 'completed', 'teamA', 0, 0);
+                                    toast({ title: "Match Completed", description: "Team 1 won!" });
                                   }}
                                >
                                   T1 WIN
@@ -596,13 +592,9 @@ export default function HomePage() {
                                   size="sm" 
                                   variant="outline" 
                                   className="h-6 text-[8px] font-black px-1.5" 
-                                  disabled={!match.startTime}
                                   onClick={() => {
-                                    if (!match.startTime) {
-                                      toast({ title: "Match not started", description: "Start the match timer first.", variant: "destructive" });
-                                      return;
-                                    }
-                                    setWinningTeam({ courtId: court.id, team: 'teamB' });
+                                    endMatch(court.id, 'completed', 'teamB', 0, 0);
+                                    toast({ title: "Match Completed", description: "Team 2 won!" });
                                   }}
                                >
                                   T2 WIN
@@ -610,7 +602,7 @@ export default function HomePage() {
                             </div>
                           </div>
                           <div className="grid grid-cols-1 gap-2 flex-1">
-                            <div className={cn("p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative", teamAScore > teamBScore ? "border-primary bg-primary/5" : "border-muted-foreground/10 bg-muted/10")}>
+                            <div className="p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative border-muted-foreground/10 bg-muted/10">
                               <span className="text-[8px] font-black uppercase text-primary opacity-50">Team 1 (T1)</span>
                               {match.teamA.map(id => {
                                 const p = players.find(player => player.id === id);
@@ -625,7 +617,7 @@ export default function HomePage() {
                                 );
                               })}
                             </div>
-                            <div className={cn("p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative", teamBScore > teamAScore ? "border-primary bg-primary/5" : "border-muted-foreground/10 bg-muted/10")}>
+                            <div className="p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative border-muted-foreground/10 bg-muted/10">
                               <span className="text-[8px] font-black uppercase text-primary opacity-50">Team 2 (T2)</span>
                               {match.teamB.map(id => {
                                 const p = players.find(player => player.id === id);
@@ -667,62 +659,20 @@ export default function HomePage() {
                     </CardContent>
                     
                     {court.status === 'occupied' && match && (
-                      <div className="p-3 bg-secondary/20 border-t space-y-2">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex-1 flex flex-col gap-1">
-                            <span className="text-[9px] font-black uppercase opacity-40 text-center">T1</span>
-                            <Input 
-                              type="number" min="0"
-                              className={cn("h-12 text-2xl font-black text-center border-2 no-spinner", teamAScore > teamBScore ? "border-primary bg-primary/5" : "bg-card")}
-                              value={!match.teamAScore || match.teamAScore === 0 ? "" : match.teamAScore}
-                              placeholder="0"
-                              onBlur={(e) => { if (e.target.value === "") handleScoreChange(match.id, 0, match.teamBScore || 0); }}
-                              onChange={(e) => handleScoreChange(match.id, parseInt(e.target.value) || 0, match.teamBScore || 0)}
-                            />
-                          </div>
-                          <div className="text-lg font-black opacity-20 mt-4 shrink-0">VS</div>
-                          <div className="flex-1 flex flex-col gap-1">
-                            <span className="text-[9px] font-black uppercase opacity-40 text-center">T2</span>
-                            <Input 
-                              type="number" min="0"
-                              className={cn("h-12 text-2xl font-black text-center border-2 no-spinner", teamBScore > teamAScore ? "border-primary bg-primary/5" : "bg-card")}
-                              value={!match.teamBScore || match.teamBScore === 0 ? "" : match.teamBScore}
-                              placeholder="0"
-                              onBlur={(e) => { if (e.target.value === "") handleScoreChange(match.id, match.teamAScore || 0, 0); }}
-                              onChange={(e) => handleScoreChange(match.id, match.teamAScore || 0, parseInt(e.target.value) || 0)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <CardFooter className="p-2.5 border-t mt-auto gap-2">
-                      {court.status === 'occupied' && match ? (
-                        <>
-                          {!match.startTime ? (
-                            <Button onClick={() => startTimer(court.id)} className="w-full h-10 bg-green-600 hover:bg-green-700 font-black text-tiny uppercase px-2 truncate">
-                              <Play className="h-3.5 w-3.5 mr-1.5 shrink-0" /> START
-                            </Button>
-                          ) : (
-                            <div className="flex w-full gap-2">
-                               <Button onClick={() => handleFinishMatch(court.id, teamAScore, teamBScore)} className="flex-1 h-10 bg-primary font-black text-tiny uppercase px-2 truncate">
-                                  FINISH
-                               </Button>
-                               <Button variant="outline" size="icon" onClick={() => endMatch(court.id, 'cancelled')} className="h-10 w-10 p-0 border-2 shrink-0">
-                                  <Ban className="h-3.5 w-3.5 text-destructive" />
-                               </Button>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="flex w-full justify-between items-center px-1 h-10">
-                          <p className="text-[9px] font-black uppercase opacity-40 truncate">READY</p>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-white shrink-0" onClick={() => deleteCourt(court.id)}>
-                            <Trash2 className="h-4 w-4" />
+                      <CardFooter className="p-2.5 border-t mt-auto gap-2">
+                        {!match.startTime ? (
+                          <Button onClick={() => startTimer(court.id)} className="w-full h-10 bg-green-600 hover:bg-green-700 font-black text-tiny uppercase px-2 truncate">
+                            <Play className="h-3.5 w-3.5 mr-1.5 shrink-0" /> START
                           </Button>
-                        </div>
-                      )}
-                    </CardFooter>
+                        ) : (
+                          <div className="flex w-full gap-2">
+                             <Button variant="outline" size="icon" onClick={() => endMatch(court.id, 'cancelled')} className="h-10 w-10 p-0 border-2 shrink-0">
+                              <Ban className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </CardFooter>
+                    )}
                   </Card>
                 );
               })}
@@ -750,77 +700,6 @@ export default function HomePage() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={!!winningTeam} onOpenChange={(open) => !open && setWinningTeam(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-black uppercase flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-primary" /> Confirm Winner
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-6 py-4">
-             <div className="p-4 bg-primary/5 rounded-xl border-2 border-primary/20 text-center">
-                <p className="text-[10px] font-black uppercase text-primary opacity-60">Winner Team</p>
-                <h3 className="text-2xl font-black uppercase">{winningTeam?.team === 'teamA' ? 'Team 1' : 'Team 2'}</h3>
-                <div className="mt-2 text-3xl font-black text-primary">{defaultWinningScore}</div>
-             </div>
-
-             <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase opacity-60">Losing Team's Score</Label>
-                <Input 
-                  ref={loserScoreInputRef}
-                  type="number" 
-                  min="0"
-                  placeholder="0" 
-                  value={loserScore === "0" ? "" : loserScore} 
-                  onChange={(e) => setLoserScore(e.target.value)}
-                  onBlur={(e) => { if (e.target.value === "") setLoserScore("0"); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleWinSubmit()}
-                  className="h-16 text-3xl font-black text-center border-2 no-spinner"
-                  autoFocus
-                />
-             </div>
-          </div>
-          <DialogFooter>
-             <Button className="w-full h-14 font-black uppercase" onClick={handleWinSubmit}>Confirm Result</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={!!pendingMatchFinish} onOpenChange={(open) => !open && setPendingMatchFinish(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-black uppercase text-lg">Zero Score Confirmation</AlertDialogTitle>
-            <AlertDialogDescription className="font-bold">
-              The losing team has a score of 0. Is this correct?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setPendingMatchFinish(null)} 
-              className="font-black uppercase"
-            >
-              Edit Score
-            </Button>
-            <AlertDialogAction 
-              onClick={() => {
-                if (pendingMatchFinish) {
-                  completeMatch(
-                    pendingMatchFinish.courtId, 
-                    pendingMatchFinish.winner, 
-                    pendingMatchFinish.scoreA, 
-                    pendingMatchFinish.scoreB
-                  );
-                }
-              }}
-              className="bg-primary font-black uppercase"
-            >
-              Yes, Correct
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

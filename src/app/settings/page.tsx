@@ -113,14 +113,14 @@ export default function SettingsPage() {
     if (window.confirm('Are you sure you want to end this session? This will clear all players, matches, and courts.')) {
       endSession(currentSession.id);
       toast({ title: 'Session ended' });
-      router.push('/session');
+      router.push('/sessions');
     }
   };
 
   const handleEnterSession = (sessionId: string) => {
     localStorage.setItem('tbc_current_session_id', sessionId);
     toast({ title: 'Session entered', description: 'You are now in this session' });
-    router.push(`/session/${sessionId}`);
+    router.push(`/sessions/${sessionId}`);
   };
 
   const handleRefreshSessions = async () => {

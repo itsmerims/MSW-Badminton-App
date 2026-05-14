@@ -10,11 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Banknote, QrCode, UserCheck, Calculator, Download, Loader2, PlusCircle, Trash2 } from 'lucide-react';
+import { Banknote, QrCode, UserCheck, Calculator, Download, Loader2, PlusCircle, Trash2, FileDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { exportFeesToCSV } from '@/lib/export';
 
 type Court = { id: number; name: string; hours: number; costPerHour: number };
 
@@ -160,13 +161,28 @@ export default function FeesPage() {
     setIsRefreshingQR(false);
   };
 
+  const handleExportFees = () => {
+    exportFeesToCSV(fees, players);
+  };
+
   return (
     <div className="container mx-auto px-4 py-4 md:py-8 space-y-6 md:space-y-8 pb-24 max-w-5xl h-full overflow-auto">
-      <header className="space-y-1 shrink-0">
-        <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
-          <Banknote className="h-6 w-6 md:h-8 md:w-8 text-green-600" /> Club Fees
-        </h1>
-        <p className="text-xs md:text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-60">Daily finance & payment tracking</p>
+      <header className="space-y-1 shrink-0 flex items-start justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tighter flex items-center gap-2">
+            <Banknote className="h-6 w-6 md:h-8 md:w-8 text-green-600" /> Club Fees
+          </h1>
+          <p className="text-xs md:text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-60">Daily finance & payment tracking</p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExportFees}
+          className="h-8 gap-2 border-2 font-black uppercase text-xs"
+        >
+          <FileDown className="h-3 w-3" />
+          Export CSV
+        </Button>
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">

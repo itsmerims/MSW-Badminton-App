@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Zap, Loader2, Trophy, Trash2 } from 'lucide-react';
+import { Plus, Zap, Loader2, Trophy, Trash2, Pencil } from 'lucide-react';
 import { generateDeterministicMatch } from '@/lib/matchmaking';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -22,11 +22,13 @@ export default function CourtsPage() {
   const { sessionId } = useParams();
   const router = useRouter();
   const { sessions } = useClub();
-  const { courts, players, matches, addCourt, deleteCourt, startMatch, endMatch, defaultWinningScore } = useClub();
+  const { courts, players, matches, addCourt, deleteCourt, updateCourt, startMatch, endMatch, defaultWinningScore } = useClub();
   const { toast } = useToast();
   const [loadingMatch, setLoadingMatch] = useState(false);
   const [newCourtName, setNewCourtName] = useState('');
   const [scoringCourtId, setScoringCourtId] = useState<string | null>(null);
+  const [editingCourt, setEditingCourt] = useState<Court | null>(null);
+  const [editCourtName, setEditCourtName] = useState('');
 
   useEffect(() => {
     const session = sessions.find(s => s.id === sessionId);
@@ -57,6 +59,32 @@ export default function CourtsPage() {
     await addCourt(newCourtName);
     setNewCourtName('');
     toast({ title: "Court Added" });
+  };
+
+  const handleEditCourt = (court: Court) => {
+    setEditingCourt(court);
+    setEditCourtName(court.name.replace('Court ', ''));
+  };
+
+  const handleSaveCourtName = () => {
+    if (!editingCourt || !editCourtName.trim()) return;
+
+    const formattedName = `Court ${editCourtName.trim()}`;
+    const isDuplicate = courts.some(c => c.name === formattedName && c.id !== editingCourt.id);
+    if (isDuplicate) {
+      toast({ title: "Duplicate Court", description: "A court with this name already exists.", variant: "destructive" });
+      return;
+    }
+
+    updateCourt(editingCourt.id, editCourtName.trim());
+    setEditingCourt(null);
+    setEditCourtName('');
+    toast({ title: "Court Name Updated" });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCourt(null);
+    setEditCourtName('');
   };
 
   const handleScoreSubmit = async (teamAScore: number | undefined, teamBScore: number | undefined, winner: 'teamA' | 'teamB') => {
@@ -143,12 +171,33 @@ export default function CourtsPage() {
         {courts.map((court: Court, idx: number) => (
           <Card key={court.id} className="border-2 shadow-sm relative group overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/20 animate-in slide-in-from-bottom-4  style={{ animationDelay: `${idx * 100}ms` }}animate-in slide-in-from-bottom-4" style={{ animationDelay: `${idx * 100}ms` }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">{court.name}</CardTitle>
+              {editingCourt?.id === court.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="text-sm font-bold text-muted-foreground bg-secondary px-3 py-2 rounded-md">Court</span>
+                  <Input
+                    value={editCourtName}
+                    onChange={e => setEditCourtName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveCourtName()}
+                    className="h-8 text-sm font-bold"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">{court.name}</CardTitle>
+              )}
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-white opacity-0 group-hover:opacity-100 transition-all active:scale-90"
+                  className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-all active:scale-90"
+                  onClick={() => handleEditCourt(court)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-destructive hover:text-white transition-all active:scale-90"
                   onClick={() => deleteCourt(court.id)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -183,7 +232,12 @@ export default function CourtsPage() {
               )}
             </CardContent>
             <CardFooter className="flex justify-between gap-2 border-t pt-4">
-              {court.status === 'occupied' ? (
+              {editingCourt?.id === court.id ? (
+                <>
+                  <Button size="sm" onClick={handleSaveCourtName} className="flex-1 transition-all active:scale-95">Save</Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelEdit} className="flex-1 transition-all active:scale-95">Cancel</Button>
+                </>
+              ) : court.status === 'occupied' ? (
                 <Button variant="outline" size="sm" onClick={() => setScoringCourtId(court.id)} className="w-full transition-all hover:bg-primary hover:text-white active:scale-95">End Match & Record Score</Button>
               ) : (
                 <p className="text-xs text-muted-foreground opacity-50">Idle</p>

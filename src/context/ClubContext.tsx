@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 import { Player, Court, Match, Fee, PaymentMethod, MatchStatus, PlayerSnapshot, Session, SessionRegisteredPlayer, SessionStatus } from '@/lib/types';
 import { SplashScreen } from '@/components/layout/SplashScreen';
 import { sendNotification } from '@/lib/notifications';
+import { isOnline as checkOnline, setupOfflineListeners, saveToLocalStorage, loadFromLocalStorage } from '@/lib/offline';
 
 interface ClubContextType {
   players: Player[];
@@ -16,11 +17,17 @@ interface ClubContextType {
   defaultWinningScore: number;
   autoAdvanceEnabled: boolean;
   isPlayer: boolean;
+  isOnline: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  undo: () => void;
+  redo: () => void;
   addPlayer: (player: Omit<Player, 'id' | 'wins' | 'gamesPlayed' | 'partnerHistory' | 'status' | 'improvementScore' | 'totalPlayTimeMinutes' | 'lastAvailableAt'>) => void;
   updatePlayer: (id: string, updates: Partial<Player>) => void;
   deletePlayer: (id: string) => void;
   addCourt: (name?: string) => string;
   deleteCourt: (id: string) => void;
+  updateCourt: (id: string, name: string) => void;
   startMatch: (match: Omit<Match, 'id' | 'timestamp' | 'isCompleted' | 'status' | 'teamASnapshots' | 'teamBSnapshots'>) => void;
   startTimer: (courtId: string) => void;
   updateMatchScore: (matchId: string, teamAScore: number, teamBScore: number) => void;
@@ -80,7 +87,51 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   const [defaultWinningScore, setDefaultWinningScoreState] = useState<number>(21);
   const [autoAdvanceEnabled, setAutoAdvanceEnabledState] = useState<boolean>(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isOnline, setIsOnline] = useState(checkOnline());
   const unsubscribeRefs = useRef<Array<() => void>>([]);
+
+  // Undo/Redo state
+  const [history, setHistory] = useState<Array<{ players: Player[]; courts: Court[]; matches: Match[] }>>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  // Save state snapshot for undo/redo
+  const saveStateSnapshot = () => {
+    const snapshot = {
+      players: [...players],
+      courts: [...courts],
+      matches: [...matches],
+    };
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(snapshot);
+      // Keep only last 50 snapshots to prevent memory issues
+      if (newHistory.length > 50) newHistory.shift();
+      return newHistory;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, 49));
+  };
+
+  const undo = () => {
+    if (!canUndo) return;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    const snapshot = history[newIndex];
+    setPlayers(snapshot.players);
+    setCourts(snapshot.courts);
+    setMatches(snapshot.matches);
+  };
+
+  const redo = () => {
+    if (!canRedo) return;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    const snapshot = history[newIndex];
+    setPlayers(snapshot.players);
+    setCourts(snapshot.courts);
+    setMatches(snapshot.matches);
+  };
 
   // Real-time Firestore listeners
   useEffect(() => {
@@ -124,6 +175,26 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       unsubscribeRefs.current = [];
     };
   }, [isLoaded]);
+
+  // Offline mode listeners
+  useEffect(() => {
+    const cleanup = setupOfflineListeners(
+      () => {
+        setIsOnline(true);
+        sendNotification('You are back online');
+      },
+      () => {
+        setIsOnline(false);
+        // Save current state to localStorage when going offline
+        saveToLocalStorage('tbc_players_offline', players);
+        saveToLocalStorage('tbc_matches_offline', matches);
+        saveToLocalStorage('tbc_courts_offline', courts);
+        saveToLocalStorage('tbc_sessions_offline', sessions);
+        sendNotification('You are offline. Changes will be saved locally.');
+      }
+    );
+    return cleanup;
+  }, [players, matches, courts, sessions]);
 
   useEffect(() => {
     const load = (key: string, fallback: any) => {
@@ -345,6 +416,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   const addPlayer = (data: any) => {
+    saveStateSnapshot();
     const newPlayer: Player = {
       ...data,
       id: generateId(),
@@ -362,14 +434,17 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const updatePlayer = (id: string, updates: Partial<Player>) => {
+    saveStateSnapshot();
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
   const deletePlayer = (id: string) => {
+    saveStateSnapshot();
     setPlayers(prev => prev.filter(p => p.id !== id));
   };
 
   const addCourt = (name?: string) => {
+    saveStateSnapshot();
     const courtNumbers = courts
       .map(c => parseInt(c.name.replace('Court ', '')))
       .filter(n => !isNaN(n));
@@ -388,6 +463,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCourt = (id: string) => {
+    saveStateSnapshot();
     const court = courts.find(c => c.id === id);
     if (court?.currentMatchId) {
       deleteMatch(court.currentMatchId);
@@ -395,7 +471,16 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setCourts(prev => prev.filter(c => c.id !== id));
   };
 
+  const updateCourt = (id: string, name: string) => {
+    saveStateSnapshot();
+    const formattedName = `Court ${name}`;
+    setCourts(prev => prev.map(c => 
+      c.id === id ? { ...c, name: formattedName } : c
+    ));
+  };
+
   const startMatch = (matchData: any) => {
+    saveStateSnapshot();
     const newMatchId = generateId();
     let targetCourtId = matchData.courtId || null;
 
@@ -477,6 +562,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const endMatch = (courtId: string, status: MatchStatus, winner?: 'teamA' | 'teamB', teamAScore?: number, teamBScore?: number) => {
+    saveStateSnapshot();
     const court = courts.find(c => c.id === courtId);
     if (!court?.currentMatchId) return;
 
@@ -567,12 +653,15 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMatch = (matchId: string) => {
+    saveStateSnapshot();
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
+    const playerIds = [...match.teamA, ...match.teamB];
+    
     setPlayers(prev => prev.map(p => 
-      [...match.teamA, ...match.teamB].includes(p.id)
-        ? { ...p, status: 'available', lastAvailableAt: Date.now() }
+      playerIds.includes(p.id)
+        ? { ...p, status: 'available' as PlayerStatus, lastAvailableAt: Date.now() }
         : p
     ));
 
@@ -586,6 +675,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
   };
 
   const swapPlayer = (matchId: string, oldPlayerId: string, newPlayerId: string) => {
+    saveStateSnapshot();
     const match = matches.find(m => m.id === matchId);
     if (!match) return;
 
@@ -1049,8 +1139,22 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     };
 
     for (const fullName of names) {
-      const displayName = buildDisplayName(fullName);
-      const incomingFirst = fullName.trim().split(' ')[0].toLowerCase();
+      // Parse skill level from name format "Name - X" where X is a number
+      let parsedName = fullName.trim();
+      let parsedSkillLevel = 3; // default skill level
+      
+      const skillLevelMatch = parsedName.match(/-(\d+)\s*$/);
+      if (skillLevelMatch) {
+        const skillLevel = parseInt(skillLevelMatch[1]);
+        if (skillLevel >= 1 && skillLevel <= 7) {
+          parsedSkillLevel = skillLevel;
+          // Remove the skill level suffix from the name
+          parsedName = parsedName.replace(/-\d+\s*$/, '').trim();
+        }
+      }
+      
+      const displayName = buildDisplayName(parsedName);
+      const incomingFirst = parsedName.split(' ')[0].toLowerCase();
 
       // 1. Check Firebase for existing player by display name
       let existingPlayer: Player | undefined;
@@ -1123,7 +1227,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
         newPlayersCount++;
         addPlayer({
           name: displayName,
-          skillLevel: 3,
+          skillLevel: parsedSkillLevel,
           lastAvailableAt: validTimestamp,
         });
       }
@@ -1156,8 +1260,9 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       players: players.filter(p => !p.sessionId || p.sessionId === currentSession?.id),
       courts: courts.filter(c => !c.sessionId || c.sessionId === currentSession?.id),
       matches: matches.filter(m => !m.sessionId || m.sessionId === currentSession?.id),
-      fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isPlayer: false,
-      addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt,
+      fees, paymentMethods, sessions, currentSession, defaultWinningScore, autoAdvanceEnabled, isPlayer: false, isOnline,
+      canUndo, canRedo, undo, redo,
+      addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt, updateCourt,
       startMatch, startTimer, updateMatchScore, endMatch, completeMatch: completeMatchAction, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
       addPaymentMethod, deletePaymentMethod: deletePaymentMethodAction, refreshPaymentMethodsFromSupabase: refreshPaymentMethods, refreshSessionsFromSupabase: refreshSessions, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
       createSession, endSession, restoreSession, getSession, getCurrentSession, selectSession, registerPlayerForSession, importPlayerToSession, ingestPlayersFromList, saveSessionFee,

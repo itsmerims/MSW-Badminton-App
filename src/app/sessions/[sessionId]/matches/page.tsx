@@ -5,12 +5,19 @@ import { useClub } from '@/context/ClubContext';
 import { SessionMatchHistory } from '@/components/session/SessionMatchHistory';
 import { useToast } from '@/hooks/use-toast';
 import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { FileDown } from 'lucide-react';
+import { exportMatchHistoryToCSV } from '@/lib/export';
 
 export default function SessionMatchesPage() {
   const { sessionId } = useParams();
   const router = useRouter();
   const { sessions, matches, players } = useClub();
   const { toast } = useToast();
+
+  const handleExportMatches = () => {
+    exportMatchHistoryToCSV(matches, players);
+  };
 
   useEffect(() => {
     const session = sessions.find(s => s.id === sessionId);
@@ -32,6 +39,15 @@ export default function SessionMatchesPage() {
               Matches played in this session
             </p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportMatches}
+            className="h-8 gap-2 border-2 font-black uppercase text-xs"
+          >
+            <FileDown className="h-3 w-3" />
+            Export CSV
+          </Button>
         </div>
         
         <SessionMatchHistory matches={matches} players={players} sessionId={sessionId as string} />
