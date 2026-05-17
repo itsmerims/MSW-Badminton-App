@@ -11,12 +11,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban, Coffee, CheckCircle2, Pencil } from 'lucide-react';
+import { Trash2, Timer, Play, Zap, ArrowLeftRight, User, DoorOpen, ListOrdered, X, Trophy, Ban, Coffee, CheckCircle2, Pencil, AlertTriangle, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { SKILL_LEVELS_SHORT, getSkillColor } from '@/lib/types';
+import { Match } from '@/lib/types';
 import { useParams } from 'next/navigation';
+import { checkRepeatPartnership, findAllRepeatPartnerships, findEligibleSwapPlayers, getPartnershipMessage, PartnershipInfo } from '@/lib/partnership';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 function LiveTimer({ startTime }: { startTime?: string }) {
   const [elapsed, setElapsed] = useState('00:00');
@@ -60,6 +63,36 @@ function WaitTimeBadge({ lastAvailableAt }: { lastAvailableAt?: number }) {
   );
 }
 
+// Repeat Partner Indicator Component
+function RepeatPartnerIndicator({ 
+  player1Id, 
+  player2Id, 
+  matches 
+}: { 
+  player1Id: string; 
+  player2Id: string; 
+  matches: Match[] 
+}) {
+  const partnership = checkRepeatPartnership(player1Id, player2Id, matches);
+  
+  if (!partnership) return null;
+  
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="inline-flex items-center gap-1 text-amber-500 ml-1">
+            <AlertTriangle className="h-3 w-3" />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {getPartnershipMessage(partnership)}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function HomePage() {
   const router = useRouter();
   const params = useParams();
@@ -95,6 +128,21 @@ export default function HomePage() {
   
   const [swapping, setSwapping] = useState<{ matchId: string; oldPlayerId: string } | null>(null);
   const [mounted, setMounted] = useState(false);
+  
+  // Repeat partnership state
+  const [repeatPartnershipModal, setRepeatPartnershipModal] = useState<{
+    matchId: string;
+    partnerships: PartnershipInfo[];
+    teamA: string[];
+    teamB: string[];
+  } | null>(null);
+  const [swapSuggestions, setSwapSuggestions] = useState<Array<{
+    id: string;
+    name: string;
+    skillLevel: number;
+    skillDiff: number;
+    replacePlayerId: string;
+  }> | null>(null);
   
   const [draftPlayerIds, setDraftPlayerIds] = useState<string[]>([]);
   const [courtDrafts, setCourtDrafts] = useState<Record<string, string[]>>({}); 
@@ -169,9 +217,26 @@ export default function HomePage() {
 
     const newDraft = [...draftPlayerIds, playerId];
     if (newDraft.length === 4) {
-      startMatch({ teamA: [newDraft[0], newDraft[1]], teamB: [newDraft[2], newDraft[3]], courtId: undefined });
-      setDraftPlayerIds([]);
-      toast({ title: "Match Drafted" });
+      const teamA = [newDraft[0], newDraft[1]];
+      const teamB = [newDraft[2], newDraft[3]];
+      
+      // Check for repeat partnerships
+      const partnerships = findAllRepeatPartnerships(teamA, teamB, matches);
+      
+      if (partnerships.length > 0) {
+        // Show repeat partnership modal
+        setRepeatPartnershipModal({
+          matchId: `temp-${Date.now()}`,
+          partnerships,
+          teamA,
+          teamB,
+        });
+        setDraftPlayerIds(newDraft);
+      } else {
+        startMatch({ teamA, teamB, courtId: undefined });
+        setDraftPlayerIds([]);
+        toast({ title: "Match Drafted" });
+      }
     } else {
       setDraftPlayerIds(newDraft);
     }
@@ -284,6 +349,84 @@ export default function HomePage() {
   const handleCancelEdit = () => {
     setEditingCourt(null);
     setEditCourtName('');
+  };
+
+  // Handle repeat partnership modal actions
+  const handleProceedWithMatch = () => {
+    if (!repeatPartnershipModal) return;
+    startMatch({ 
+      teamA: repeatPartnershipModal.teamA, 
+      teamB: repeatPartnershipModal.teamB, 
+      courtId: undefined 
+    });
+    setDraftPlayerIds([]);
+    setRepeatPartnershipModal(null);
+    toast({ title: "Match Created" });
+  };
+
+  const handleSuggestSwap = () => {
+    if (!repeatPartnershipModal) return;
+    
+    const partnership = repeatPartnershipModal.partnerships[0];
+    const playerToReplace = partnership.player1Id;
+    const player = players.find(p => p.id === playerToReplace);
+    
+    if (!player) return;
+    
+    const currentMatchPlayers = [...repeatPartnershipModal.teamA, ...repeatPartnershipModal.teamB];
+    const availablePlayers = players.filter(p => p.status === 'available');
+    
+    const suggestions = findEligibleSwapPlayers(
+      playerToReplace,
+      player.skillLevel,
+      availablePlayers,
+      currentMatchPlayers
+    );
+    
+    if (suggestions.length > 0) {
+      setSwapSuggestions(suggestions.map(s => ({ ...s, replacePlayerId: playerToReplace })));
+    } else {
+      toast({ 
+        title: "No eligible players", 
+        description: "No available players with similar skill level found.",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleExecuteSwap = (suggestionId: string) => {
+    if (!repeatPartnershipModal || !swapSuggestions) return;
+    
+    const suggestion = swapSuggestions.find(s => s.id === suggestionId);
+    if (!suggestion) return;
+    
+    // Replace the player in the match
+    const newTeamA = repeatPartnershipModal.teamA.map(id => 
+      id === suggestion.replacePlayerId ? suggestion.id : id
+    );
+    const newTeamB = repeatPartnershipModal.teamB.map(id => 
+      id === suggestion.replacePlayerId ? suggestion.id : id
+    );
+    
+    // Check if the new match still has repeat partnerships
+    const newPartnerships = findAllRepeatPartnerships(newTeamA, newTeamB, matches);
+    
+    if (newPartnerships.length > 0) {
+      setRepeatPartnershipModal({
+        ...repeatPartnershipModal,
+        partnerships: newPartnerships,
+        teamA: newTeamA,
+        teamB: newTeamB,
+      });
+      setSwapSuggestions(null);
+      toast({ title: "Player swapped but repeat partnership still exists" });
+    } else {
+      startMatch({ teamA: newTeamA, teamB: newTeamB, courtId: undefined });
+      setDraftPlayerIds([]);
+      setRepeatPartnershipModal(null);
+      setSwapSuggestions(null);
+      toast({ title: "Match Created with swapped player" });
+    }
   };
 
   return (
@@ -448,13 +591,16 @@ export default function HomePage() {
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                   <div className="p-3 pt-6 flex items-center justify-between gap-2">
-                    <div className="flex flex-col space-y-1.5 flex-1 min-w-0 border-l-4 border-primary/20 pl-2">
+                    <div className="flex flex-col space-y-1.5 flex-1 min-w-0 items-start text-left border-l-4 border-primary/20 pl-2">
                       <span className="text-[8px] font-black uppercase text-primary opacity-50">T1</span>
-                      {match.teamA.map(id => {
+                      {match.teamA.map((id, idx) => {
                         const p = players.find(player => player.id === id);
+                        const nextPlayerId = match.teamA[idx + 1];
                         return (
                           <div key={id} className="flex items-center gap-1.5 min-w-0 group/p">
                             <span className="text-[11px] font-black truncate leading-tight flex-1">{p?.name}</span>
+                            {p && <Badge variant="outline" className={cn("text-[8px] h-3.5 px-1 shrink-0", getSkillColor(p.skillLevel))}>{SKILL_LEVELS_SHORT[p.skillLevel]}</Badge>}
+                            {nextPlayerId && <RepeatPartnerIndicator player1Id={id} player2Id={nextPlayerId} matches={matches} />}
                             <Button 
                               variant="ghost" 
                               size="icon" 
@@ -463,7 +609,6 @@ export default function HomePage() {
                             >
                               <ArrowLeftRight className="h-2.5 w-2.5" />
                             </Button>
-                            {p && <Badge variant="outline" className={cn("text-[8px] h-3.5 px-1 shrink-0", getSkillColor(p.skillLevel))}>{SKILL_LEVELS_SHORT[p.skillLevel]}</Badge>}
                           </div>
                         );
                       })}
@@ -471,11 +616,13 @@ export default function HomePage() {
                     <div className="text-[9px] font-black opacity-30 px-1 shrink-0">VS</div>
                     <div className="flex flex-col space-y-1.5 flex-1 min-w-0 items-end text-right border-r-4 border-primary/20 pr-2">
                       <span className="text-[8px] font-black uppercase text-primary opacity-50">T2</span>
-                      {match.teamB.map(id => {
+                      {match.teamB.map((id, idx) => {
                         const p = players.find(player => player.id === id);
+                        const nextPlayerId = match.teamB[idx + 1];
                         return (
                           <div key={id} className="flex items-center gap-1.5 min-w-0 justify-end group/p">
-                             <Button 
+                            <RepeatPartnerIndicator player1Id={id} player2Id={nextPlayerId} matches={matches} />
+                            <Button 
                               variant="ghost" 
                               size="icon" 
                               className="h-3.5 w-3.5 opacity-0 group-hover/p:opacity-100 shrink-0" 
@@ -604,13 +751,15 @@ export default function HomePage() {
                           <div className="grid grid-cols-1 gap-2 flex-1">
                             <div className="p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative border-muted-foreground/10 bg-muted/10">
                               <span className="text-[8px] font-black uppercase text-primary opacity-50">Team 1 (T1)</span>
-                              {match.teamA.map(id => {
+                              {match.teamA.map((id, idx) => {
                                 const p = players.find(player => player.id === id);
+                                const nextPlayerId = match.teamA[idx + 1];
                                 return (
                                   <div key={id} className="flex justify-between items-center group/p gap-1">
                                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                       <span className="text-compact font-black truncate flex-1 leading-tight">{p?.name}</span>
                                       {p && <Badge variant="outline" className={cn("text-[8px] h-3.5 px-1 shrink-0", getSkillColor(p.skillLevel))}>{SKILL_LEVELS_SHORT[p.skillLevel]}</Badge>}
+                                      {nextPlayerId && <RepeatPartnerIndicator player1Id={id} player2Id={nextPlayerId} matches={matches} />}
                                     </div>
                                     <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover/p:opacity-100 shrink-0" onClick={() => setSwapping({ matchId: match.id, oldPlayerId: id })}><ArrowLeftRight className="h-3 w-3" /></Button>
                                   </div>
@@ -619,13 +768,15 @@ export default function HomePage() {
                             </div>
                             <div className="p-3 rounded-lg border-l-4 space-y-1.5 transition-colors relative border-muted-foreground/10 bg-muted/10">
                               <span className="text-[8px] font-black uppercase text-primary opacity-50">Team 2 (T2)</span>
-                              {match.teamB.map(id => {
+                              {match.teamB.map((id, idx) => {
                                 const p = players.find(player => player.id === id);
+                                const nextPlayerId = match.teamB[idx + 1];
                                 return (
                                   <div key={id} className="flex justify-between items-center group/p gap-1">
                                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                       <span className="text-compact font-black truncate flex-1 leading-tight">{p?.name}</span>
                                       {p && <Badge variant="outline" className={cn("text-[8px] h-3.5 px-1 shrink-0", getSkillColor(p.skillLevel))}>{SKILL_LEVELS_SHORT[p.skillLevel]}</Badge>}
+                                      {nextPlayerId && <RepeatPartnerIndicator player1Id={id} player2Id={nextPlayerId} matches={matches} />}
                                     </div>
                                     <Button variant="ghost" size="icon" className="h-4 w-4 opacity-0 group-hover/p:opacity-100 shrink-0" onClick={() => setSwapping({ matchId: match.id, oldPlayerId: id })}><ArrowLeftRight className="h-3 w-3" /></Button>
                                   </div>
@@ -698,6 +849,110 @@ export default function HomePage() {
               ))}
             </div>
           </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Repeat Partnership Warning Modal */}
+      <Dialog open={!!repeatPartnershipModal} onOpenChange={(open) => !open && setRepeatPartnershipModal(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-black uppercase">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Repeat Partnership Detected
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-amber-50 border-2 border-amber-200 rounded-lg p-4">
+              <p className="text-sm font-black text-amber-900 mb-3">
+                Warning: The following players were recently partners:
+              </p>
+              {repeatPartnershipModal?.partnerships.map((partnership, idx) => {
+                const p1 = players.find(p => p.id === partnership.player1Id);
+                const p2 = players.find(p => p.id === partnership.player2Id);
+                return (
+                  <div key={idx} className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                    <span>{p1?.name}</span>
+                    <span>&</span>
+                    <span>{p2?.name}</span>
+                    <span className="text-xs text-amber-600">({getPartnershipMessage(partnership)})</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {!swapSuggestions ? (
+              <div className="flex flex-col gap-3">
+                <Button 
+                  onClick={handleSuggestSwap}
+                  className="w-full h-12 font-black uppercase gap-2"
+                  variant="outline"
+                >
+                  <Users className="h-4 w-4" />
+                  Suggest Player Swap
+                </Button>
+                <Button 
+                  onClick={handleProceedWithMatch}
+                  className="w-full h-12 font-black uppercase"
+                  variant="default"
+                >
+                  Proceed Anyway
+                </Button>
+                <Button 
+                  onClick={() => {
+                    setRepeatPartnershipModal(null);
+                    setDraftPlayerIds([]);
+                  }}
+                  className="w-full h-12 font-black uppercase"
+                  variant="ghost"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm font-bold uppercase text-muted-foreground">
+                  Select a player to swap:
+                </p>
+                <ScrollArea className="h-[300px] border rounded-lg">
+                  <div className="p-2 space-y-2">
+                    {swapSuggestions.map((suggestion) => {
+                      const player = players.find(p => p.id === suggestion.id);
+                      const playerToReplace = players.find(p => p.id === suggestion.replacePlayerId);
+                      return (
+                        <Button
+                          key={suggestion.id}
+                          onClick={() => handleExecuteSwap(suggestion.id)}
+                          className="w-full justify-between h-auto py-3 px-4 border-2 group hover:border-primary"
+                          variant="outline"
+                        >
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="font-black text-sm truncate w-full text-left">{player?.name}</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className={cn("text-[9px] uppercase font-black h-4", getSkillColor(suggestion.skillLevel))}>
+                                {SKILL_LEVELS_SHORT[suggestion.skillLevel]}
+                              </Badge>
+                              <span className="text-[10px] text-muted-foreground font-bold">
+                                Replaces: {playerToReplace?.name}
+                              </span>
+                            </div>
+                          </div>
+                          <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </ScrollArea>
+                <Button 
+                  onClick={() => setSwapSuggestions(null)}
+                  className="w-full h-10 font-black uppercase"
+                  variant="ghost"
+                >
+                  Back
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
