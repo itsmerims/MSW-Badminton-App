@@ -1,6 +1,6 @@
 # MSW Badminton | Badminton Club Management
 
-A professional-grade badminton club management application built with **Next.js 15**, **Tailwind CSS**, and **Supabase**. Designed for live court queuing, deterministic matchmaking, and daily financial tracking.
+A professional-grade badminton club management application built with **Next.js 15**, **Tailwind CSS**, and **Firebase**. Designed for live court queuing, deterministic matchmaking, and daily financial tracking.
 
 ## 🚀 Key Features
 
@@ -43,7 +43,7 @@ Our deterministic engine ensures fair and socially diverse games:
 
 ## 🛠️ Tech Stack
 - **Framework**: Next.js 15 (App Router)
-- **Backend**: Supabase (Realtime Database & Auth)
+- **Backend**: localStorage (Client-side persistence)
 - **Styling**: Tailwind CSS + ShadCN UI
 - **Icons**: Lucide React
 - **Animations**: Tailwind CSS Animate + Custom Transitions

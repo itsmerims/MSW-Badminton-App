@@ -1,9 +1,8 @@
 
 "use client";
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useClub } from '@/context/ClubContext';
-import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,9 +56,8 @@ function QRImage({ src, alt, className }: { src: string; alt: string; className?
 }
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, refreshPaymentMethodsFromSupabase, currentSession, saveSessionFee } = useClub();
-  const { user } = useUser();
-  const isPlayer = !user;
+  const { players, fees, paymentMethods, updateFee, togglePayment, refreshPaymentMethods, currentSession, saveSessionFee, saveCalculatorData } = useClub();
+  const isPlayer = false;
   const [today, setToday] = useState<string>('');
   const [isRefreshingQR, setIsRefreshingQR] = useState(false);
   const [isSavingToSession, setIsSavingToSession] = useState(false);
@@ -71,6 +69,45 @@ export default function FeesPage() {
   const [hoursPlayed, setHoursPlayed] = useState(2);
   const [entranceFee, setEntranceFee] = useState(0);
   const [includeEntranceFee, setIncludeEntranceFee] = useState(true);
+  const [calcLoaded, setCalcLoaded] = useState(false);
+
+  const FEES_CALC_KEY = 'tbc_fees_calculator';
+
+  // Load persisted calculator data from localStorage on mount
+  useEffect(() => {
+    if (calcLoaded) return;
+    const saved = localStorage.getItem(FEES_CALC_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      setShuttleUnits(data.shuttleUnits ?? 0);
+      setShuttleCostPerUnit(data.shuttleCostPerUnit ?? 0);
+      setCourtCount(data.courtCount ?? 1);
+      setCourtCostPerHour(data.courtCostPerHour ?? 0);
+      setHoursPlayed(data.hoursPlayed ?? 2);
+      setEntranceFee(data.entranceFee ?? 0);
+      setIncludeEntranceFee(data.includeEntranceFee ?? true);
+    }
+    setCalcLoaded(true);
+  }, [calcLoaded]);
+
+  // Auto-save calculator data to localStorage whenever inputs change
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!calcLoaded) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      localStorage.setItem(FEES_CALC_KEY, JSON.stringify({
+        shuttleUnits,
+        shuttleCostPerUnit,
+        courtCount,
+        courtCostPerHour,
+        hoursPlayed,
+        entranceFee,
+        includeEntranceFee,
+      }));
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [shuttleUnits, shuttleCostPerUnit, courtCount, courtCostPerHour, hoursPlayed, entranceFee, includeEntranceFee, calcLoaded]);
 
   // Load persisted per-player fee from current session
   const sessionPerPlayerFee = currentSession?.perPlayerFee;
@@ -107,7 +144,7 @@ export default function FeesPage() {
 
   const handleQRMethodsClick = async () => {
     setIsRefreshingQR(true);
-    await refreshPaymentMethodsFromSupabase();
+    await refreshPaymentMethods();
     setIsRefreshingQR(false);
   };
 

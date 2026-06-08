@@ -19,7 +19,7 @@ export default function SettingsPage() {
     players, paymentMethods, addPaymentMethod, deletePaymentMethod, resetDailyBoard,
     wipeAllData, defaultWinningScore, setDefaultWinningScore,
     autoAdvanceEnabled, setAutoAdvanceEnabled, currentSession, endSession,
-    sessions, refreshSessionsFromSupabase
+    sessions, refreshSessions
   } = useClub();
   const { theme, toggleTheme } = useTheme();
   const { toast } = useToast();
@@ -125,7 +125,7 @@ export default function SettingsPage() {
 
   const handleRefreshSessions = async () => {
     setIsRefreshingSessions(true);
-    await refreshSessionsFromSupabase();
+    await refreshSessions();
     setIsRefreshingSessions(false);
     toast({ title: 'Sessions refreshed successfully' });
   };

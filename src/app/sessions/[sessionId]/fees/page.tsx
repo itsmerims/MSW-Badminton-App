@@ -3,7 +3,6 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useClub } from '@/context/ClubContext';
-import { useUser } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,7 +59,7 @@ function QRImage({ src, alt, className }: { src: string; alt: string; className?
 }
 
 export default function FeesPage() {
-  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer, refreshPaymentMethodsFromSupabase, currentSession, saveSessionFee, saveCalculatorData } = useClub();
+  const { players, fees, paymentMethods, updateFee, togglePayment, isPlayer, refreshPaymentMethods, currentSession, saveSessionFee, saveCalculatorData } = useClub();
   const [today, setToday] = useState<string>('');
   const [isRefreshingQR, setIsRefreshingQR] = useState(false);
   const [isSavingToSession, setIsSavingToSession] = useState(false);
@@ -157,7 +156,7 @@ export default function FeesPage() {
 
   const handleQRMethodsClick = async () => {
     setIsRefreshingQR(true);
-    await refreshPaymentMethodsFromSupabase();
+    await refreshPaymentMethods();
     setIsRefreshingQR(false);
   };
 

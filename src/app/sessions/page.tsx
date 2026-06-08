@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
 export default function SessionsPage() {
-  const { sessions, currentSession, createSession, endSession, restoreSession, getPlayerCountForSession, refreshSessionsFromSupabase, selectSession } = useClub();
+  const { sessions, currentSession, createSession, endSession, restoreSession, getPlayerCountForSession, refreshSessions, selectSession } = useClub();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -37,7 +37,7 @@ export default function SessionsPage() {
 
   const handleRefreshSessions = async () => {
     setIsRefreshing(true);
-    await refreshSessionsFromSupabase();
+    await refreshSessions();
     setIsRefreshing(false);
     toast({ title: 'Sessions refreshed successfully' });
   };

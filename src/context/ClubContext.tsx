@@ -40,8 +40,8 @@ interface ClubContextType {
   togglePayment: (date: string, playerId: string) => void;
   addPaymentMethod: (name: string, imageData: string) => Promise<void>;
   deletePaymentMethod: (id: string) => Promise<void>;
-  refreshPaymentMethodsFromSupabase: () => Promise<void>;
-  refreshSessionsFromSupabase: () => Promise<void>;
+  refreshPaymentMethods: () => Promise<void>;
+  refreshSessions: () => Promise<void>;
   setDefaultWinningScore: (score: number) => void;
   setAutoAdvanceEnabled: (enabled: boolean) => void;
   resetDailyBoard: () => void;
@@ -133,49 +133,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setMatches(snapshot.matches);
   };
 
-  // Real-time Firestore listeners
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    let cancelled = false;
-
-    const setupListeners = async () => {
-      try {
-        const { db } = await import('@/firebase/config');
-        const { subscribeToSessions } = await import('@/firebase/firestore/session-service');
-        const { subscribeToPlayers } = await import('@/firebase/firestore/player-service');
-
-        if (cancelled) return;
-
-        const unsubSessions = subscribeToSessions(db, (firebaseSessions) => {
-          if (firebaseSessions.length > 0) {
-            setSessions(firebaseSessions);
-            localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(firebaseSessions));
-          }
-        });
-
-        const unsubPlayers = subscribeToPlayers(db, (firebasePlayers) => {
-          if (firebasePlayers.length > 0) {
-            setPlayers(firebasePlayers);
-            localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(firebasePlayers));
-          }
-        });
-
-        unsubscribeRefs.current.push(unsubSessions, unsubPlayers);
-      } catch (e) {
-        console.error('[Real-time listeners] Setup error:', e);
-      }
-    };
-
-    setupListeners();
-
-    return () => {
-      cancelled = true;
-      unsubscribeRefs.current.forEach(unsub => unsub());
-      unsubscribeRefs.current = [];
-    };
-  }, [isLoaded]);
-
   // Offline mode listeners
   useEffect(() => {
     const cleanup = setupOfflineListeners(
@@ -231,71 +188,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       setAutoAdvanceEnabledState(savedAutoAdvance !== null ? JSON.parse(savedAutoAdvance) : true);
     };
 
-    const loadFromFirebase = async () => {
-      try {
-        // Dynamic import Firebase to avoid build issues
-        const { db } = await import('@/firebase/config');
-        const { doc, setDoc, getDoc, collection, getDocs, updateDoc, deleteDoc } = await import('firebase/firestore');
-
-        // Load players from Firebase
-        const playersSnapshot = await getDocs(collection(db, 'players'));
-        const firebasePlayers = playersSnapshot.docs.map(doc => doc.data() as Player);
-        if (firebasePlayers.length > 0) {
-          setPlayers(firebasePlayers);
-          localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(firebasePlayers));
-        }
-
-        // Load courts from Firebase
-        const courtsSnapshot = await getDocs(collection(db, 'courts'));
-        const firebaseCourts = courtsSnapshot.docs.map(doc => doc.data() as Court);
-        if (firebaseCourts.length > 0) {
-          setCourts(firebaseCourts);
-          localStorage.setItem(STORAGE_KEYS.COURTS, JSON.stringify(firebaseCourts));
-        }
-
-        // Load matches from Firebase
-        const matchesSnapshot = await getDocs(collection(db, 'matches'));
-        const firebaseMatches = matchesSnapshot.docs.map(doc => doc.data() as Match);
-        if (firebaseMatches.length > 0) {
-          setMatches(firebaseMatches);
-          localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(firebaseMatches));
-        }
-
-        // Load sessions from Firebase
-        const sessionsSnapshot = await getDocs(collection(db, 'sessions'));
-        const firebaseSessions = sessionsSnapshot.docs.map(doc => doc.data() as Session);
-        if (firebaseSessions.length > 0) {
-          setSessions(firebaseSessions);
-          localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(firebaseSessions));
-        }
-
-        // Load payment methods from Firebase
-        const paymentMethodsSnapshot = await getDocs(collection(db, 'payment_methods'));
-        const firebasePaymentMethods = paymentMethodsSnapshot.docs.map(doc => doc.data() as PaymentMethod);
-        if (firebasePaymentMethods.length > 0) {
-          setPaymentMethods(firebasePaymentMethods);
-          localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(firebasePaymentMethods));
-        }
-
-      } catch (error) {
-        console.error('Firebase load error:', error);
-        // Fallback to localStorage if Firebase fails
-        loadFromLocalStorage();
-      }
-    };
-
-    // Check if localStorage has data, if not try to load from Firebase
-    const hasLocalData = localStorage.getItem(STORAGE_KEYS.PLAYERS) &&
-                        localStorage.getItem(STORAGE_KEYS.COURTS);
-
-    if (hasLocalData) {
-      loadFromLocalStorage();
-    } else {
-      loadFromFirebase().then(() => {
-        // If Firebase also has no data, load empty state
-        loadFromLocalStorage();
-      });
-    }
+    // Load from localStorage only
 
     const timer = setTimeout(() => {
       setIsLoaded(true);
@@ -315,103 +208,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.WINNING_SCORE, defaultWinningScore.toString());
     localStorage.setItem(STORAGE_KEYS.AUTO_ADVANCE, JSON.stringify(autoAdvanceEnabled));
   }, [players, courts, matches, fees, paymentMethods, sessions, defaultWinningScore, autoAdvanceEnabled, isLoaded]);
-
-  // Firebase sync: Local storage is source of truth, Firebase is backup
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    const syncToFirebase = async () => {
-      try {
-        // Dynamic import Firebase to avoid build issues
-        const { db } = await import('@/firebase/config');
-        const { doc, setDoc, getDoc, collection, getDocs, updateDoc, deleteDoc } = await import('firebase/firestore');
-        const { stripUndefined } = await import('@/lib/utils');
-
-        // Sync players
-        const playersRef = collection(db, 'players');
-        const playersSnapshot = await getDocs(playersRef);
-        const existingPlayerIds = new Set(playersSnapshot.docs.map(doc => doc.id));
-
-        for (const player of players) {
-          const playerRef = doc(db, 'players', player.id);
-          await setDoc(playerRef, stripUndefined(player), { merge: true });
-          existingPlayerIds.delete(player.id);
-        }
-
-        // Delete players that no longer exist locally
-        for (const id of existingPlayerIds) {
-          await deleteDoc(doc(db, 'players', id));
-        }
-
-        // Sync courts
-        const courtsRef = collection(db, 'courts');
-        const courtsSnapshot = await getDocs(courtsRef);
-        const existingCourtIds = new Set(courtsSnapshot.docs.map(doc => doc.id));
-
-        for (const court of courts) {
-          const courtRef = doc(db, 'courts', court.id);
-          await setDoc(courtRef, stripUndefined(court), { merge: true });
-          existingCourtIds.delete(court.id);
-        }
-
-        for (const id of existingCourtIds) {
-          await deleteDoc(doc(db, 'courts', id));
-        }
-
-        // Sync matches
-        const matchesRef = collection(db, 'matches');
-        const matchesSnapshot = await getDocs(matchesRef);
-        const existingMatchIds = new Set(matchesSnapshot.docs.map(doc => doc.id));
-
-        for (const match of matches) {
-          const matchRef = doc(db, 'matches', match.id);
-          await setDoc(matchRef, stripUndefined(match), { merge: true });
-          existingMatchIds.delete(match.id);
-        }
-
-        for (const id of existingMatchIds) {
-          await deleteDoc(doc(db, 'matches', id));
-        }
-
-        // Sync sessions
-        const sessionsRef = collection(db, 'sessions');
-        const sessionsSnapshot = await getDocs(sessionsRef);
-        const existingSessionIds = new Set(sessionsSnapshot.docs.map(doc => doc.id));
-
-        for (const session of sessions) {
-          const sessionRef = doc(db, 'sessions', session.id);
-          await setDoc(sessionRef, stripUndefined(session), { merge: true });
-          existingSessionIds.delete(session.id);
-        }
-
-        for (const id of existingSessionIds) {
-          await deleteDoc(doc(db, 'sessions', id));
-        }
-
-        // Sync payment methods
-        const paymentMethodsRef = collection(db, 'payment_methods');
-        const paymentMethodsSnapshot = await getDocs(paymentMethodsRef);
-        const existingPaymentMethodIds = new Set(paymentMethodsSnapshot.docs.map(doc => doc.id));
-
-        for (const method of paymentMethods) {
-          const methodRef = doc(db, 'payment_methods', method.id);
-          await setDoc(methodRef, stripUndefined(method), { merge: true });
-          existingPaymentMethodIds.delete(method.id);
-        }
-
-        for (const id of existingPaymentMethodIds) {
-          await deleteDoc(doc(db, 'payment_methods', id));
-        }
-
-      } catch (error) {
-        console.error('Firebase sync error:', error);
-      }
-    };
-
-    // Debounce sync to avoid too many writes
-    const timeoutId = setTimeout(syncToFirebase, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [players, courts, matches, sessions, currentSession, isLoaded]);
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -771,83 +567,28 @@ export function ClubProvider({ children }: { children: ReactNode }) {
 
   const addPaymentMethod = async (name: string, imageData: string) => {
     const id = generateId();
-    try {
-      // Store the image data URL directly in Firestore (no external storage needed)
-      const newMethod: PaymentMethod = { id, name, imageUrl: imageData };
-      setPaymentMethods(prev => [...prev, newMethod]);
-
-      // Save metadata to Firestore
-      const { db } = await import('@/firebase/config');
-      const { savePaymentMethod } = await import('@/firebase/firestore/storage-service');
-      await savePaymentMethod(db, newMethod);
-    } catch (error) {
-      console.error('Failed to save QR code:', error);
-      // Fallback to localStorage
-      const newMethod: PaymentMethod = { id, name, imageUrl: imageData };
-      setPaymentMethods(prev => [...prev, newMethod]);
-    }
+    const newMethod: PaymentMethod = { id, name, imageUrl: imageData };
+    setPaymentMethods(prev => [...prev, newMethod]);
   };
 
   const deletePaymentMethodAction = async (id: string) => {
-    try {
-      // Delete metadata from Firestore
-      const { db } = await import('@/firebase/config');
-      const { deletePaymentMethod: deleteDoc } = await import('@/firebase/firestore/storage-service');
-      await deleteDoc(db, id);
-    } catch (error) {
-      console.error('Failed to delete QR code:', error);
-    }
     setPaymentMethods(prev => prev.filter(pm => pm.id !== id));
   };
 
   const refreshPaymentMethods = async () => {
-    try {
-      // Load payment methods from Firestore
-      const { db } = await import('@/firebase/config');
-      const { getPaymentMethods } = await import('@/firebase/firestore/storage-service');
-      const methods = await getPaymentMethods(db);
-      if (methods.length > 0) {
-        setPaymentMethods(methods);
-        localStorage.setItem(STORAGE_KEYS.PAYMENT_METHODS, JSON.stringify(methods));
-      }
-    } catch (error) {
-      console.error('Failed to refresh payment methods:', error);
+    // Load payment methods from localStorage
+    const saved = localStorage.getItem(STORAGE_KEYS.PAYMENT_METHODS);
+    if (saved) {
+      setPaymentMethods(JSON.parse(saved));
     }
   };
 
   const refreshSessions = async () => {
-    try {
-      const { db } = await import('@/firebase/config');
-      const { getSessionsFromFirebase } = await import('@/firebase/firestore/storage-service');
-      const { getPlayers: getPlayersFromFirestore } = await import('@/firebase/firestore/player-service');
-
-      // Fetch both sessions and players in parallel
-      const [firebaseSessions, firebasePlayers] = await Promise.all([
-        getSessionsFromFirebase(db),
-        getPlayersFromFirestore(db),
-      ]);
-
-      // --- Update sessions ---
-      if (firebaseSessions.length > 0) {
-        setSessions(firebaseSessions);
-        localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(firebaseSessions));
-
-        // Keep currentSession in sync: if it exists in the refreshed list, use the
-        // updated document; otherwise keep what we have.
-        setCurrentSession(prev => {
-          if (!prev) return prev;
-          const updated = firebaseSessions.find(s => s.id === prev.id);
-          return updated ?? prev;
-        });
-      }
-
-      // --- Update players (brings sessionId assignments up to date) ---
-      if (firebasePlayers.length > 0) {
-        setPlayers(firebasePlayers);
-        localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(firebasePlayers));
-      }
-    } catch (error) {
-      console.error('[refreshSessions] Failed to refresh from Firebase:', error);
+    // Load sessions from localStorage
+    const savedSessions = localStorage.getItem(STORAGE_KEYS.SESSIONS);
+    if (savedSessions) {
+      const loadedSessions = JSON.parse(savedSessions);
+      setSessions(loadedSessions);
     }
   };
 
@@ -887,13 +628,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
     setSessions(prev => [...prev, newSession]);
     setCurrentSession(newSession);
 
-    // Sync to Firestore
-    import('@/firebase/config').then(({ db }) =>
-      import('@/firebase/firestore/session-service').then(({ createSessionDoc }) =>
-        createSessionDoc(db, newSession).catch(e => console.error('[createSession] Firestore sync error:', e))
-      )
-    );
-
     return newSession;
   };
 
@@ -910,13 +644,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       setCourts([]);
       console.log('[endSession] Session state cleared (preserving players for rankings)');
     }
-
-    // Sync to Firestore
-    import('@/firebase/config').then(({ db }) =>
-      import('@/firebase/firestore/session-service').then(({ endSession: endSessionFirestore }) =>
-        endSessionFirestore(db, sessionId).catch(e => console.error('[endSession] Firestore sync error:', e))
-      )
-    );
   };
 
   const restoreSession = async (sessionId: string): Promise<void> => {
@@ -929,14 +656,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       s.id === sessionId ? { ...s, status: 'active' } : s
     ));
     setCurrentSession({ ...session, status: 'active' });
-
-    try {
-      const { db } = await import('@/firebase/config');
-      const { restoreSession: restoreFirestore } = await import('@/firebase/firestore/session-service');
-      await restoreFirestore(db, sessionId);
-    } catch (e) {
-      console.error('[restoreSession] Firestore sync error:', e);
-    }
   };
 
   const importPlayerToSession = async (playerId: string, sessionId: string): Promise<void> => {
@@ -952,14 +671,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
         lastAvailableAt: Date.now(),
       } : p
     ));
-
-    try {
-      const { db } = await import('@/firebase/config');
-      const { importPlayerToSession: importFirestore } = await import('@/firebase/firestore/player-service');
-      await importFirestore(db, playerId, sessionId);
-    } catch (e) {
-      console.error('[importPlayerToSession] Firestore sync error:', e);
-    }
   };
 
   const completeMatchAction = async (matchId: string, teamAScore: number, teamBScore: number): Promise<{ winner: 'teamA' | 'teamB' | null }> => {
@@ -1004,15 +715,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       };
     }));
 
-    // Firestore atomic transaction
-    try {
-      const { db } = await import('@/firebase/config');
-      const { completeMatch: completeMatchFirestore } = await import('@/firebase/firestore/match-service');
-      await completeMatchFirestore(db, matchId, teamAScore, teamBScore);
-    } catch (e) {
-      console.error('[completeMatch] Firestore transaction error:', e);
-    }
-
     if (autoAdvanceEnabled && match.courtId) {
       autoAdvanceToCourt(match.courtId);
     }
@@ -1027,14 +729,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       s.id === currentSession.id ? { ...s, perPlayerFee } : s
     ));
     setCurrentSession(prev => prev ? { ...prev, perPlayerFee } : prev);
-
-    try {
-      const { db } = await import('@/firebase/config');
-      const { saveSessionFee: saveFirestore } = await import('@/firebase/firestore/session-service');
-      await saveFirestore(db, currentSession.id, perPlayerFee);
-    } catch (e) {
-      console.error('[saveSessionFee] Firestore sync error:', e);
-    }
   };
 
   const saveCalculatorData = async (data: Session['calculatorData']): Promise<void> => {
@@ -1044,14 +738,6 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       s.id === currentSession.id ? { ...s, calculatorData: data } : s
     ));
     setCurrentSession(prev => prev ? { ...prev, calculatorData: data } : prev);
-
-    try {
-      const { db } = await import('@/firebase/config');
-      const { saveCalculatorData: saveFirestore } = await import('@/firebase/firestore/session-service');
-      await saveFirestore(db, currentSession.id, data);
-    } catch (e) {
-      console.error('[saveCalculatorData] Firestore sync error:', e);
-    }
   };
 
   const setPlayerResting = (id: string) => {
@@ -1156,33 +842,11 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       const displayName = buildDisplayName(parsedName);
       const incomingFirst = parsedName.split(' ')[0].toLowerCase();
 
-      // 1. Check Firebase for existing player by display name
+      // Check local state for existing player by display name
       let existingPlayer: Player | undefined;
-      let existingPlayerId: string | undefined;
-
-      try {
-        const { db } = await import('@/firebase/config');
-        const { collection, getDocs, query, where } = await import('firebase/firestore');
-        
-        const playersRef = collection(db, 'players');
-        const q = query(playersRef, where('name', '==', displayName));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          const playerData = querySnapshot.docs[0].data() as Player;
-          existingPlayerId = querySnapshot.docs[0].id;
-          existingPlayer = { ...playerData, id: existingPlayerId };
-        }
-      } catch (e) {
-        console.error('[ingestPlayersFromList] Error checking Firebase for existing player:', e);
-      }
-
-      // 2. If not found in Firebase, check local state by display name
-      if (!existingPlayer) {
-        existingPlayer = players.find(
-          p => p.name.toLowerCase() === displayName.toLowerCase()
-        );
-      }
+      existingPlayer = players.find(
+        p => p.name.toLowerCase() === displayName.toLowerCase()
+      );
 
       // 3. When this is the only person with that first name in the batch, also
       //    try matching by first name alone in local state. This handles the case where the player
@@ -1209,20 +873,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
           ];
         }
         
-        // Use the Firebase ID if we found it there, otherwise use local ID
-        const playerIdToUpdate = existingPlayerId || existingPlayer.id;
-        updatePlayer(playerIdToUpdate, updates);
-
-        // Sync the session assignment to Firestore.
-        if (currentSession?.id) {
-          try {
-            const { db } = await import('@/firebase/config');
-            const { importPlayerToSession: importFirestore } = await import('@/firebase/firestore/player-service');
-            await importFirestore(db, playerIdToUpdate, currentSession.id);
-          } catch (e) {
-            console.error('[ingestPlayersFromList] Firestore session import error:', e);
-          }
-        }
+        updatePlayer(existingPlayer.id, updates);
       } else {
         newPlayersCount++;
         addPlayer({
@@ -1264,7 +915,7 @@ export function ClubProvider({ children }: { children: ReactNode }) {
       canUndo, canRedo, undo, redo,
       addPlayer, updatePlayer, deletePlayer, addCourt, deleteCourt, updateCourt,
       startMatch, startTimer, updateMatchScore, endMatch, completeMatch: completeMatchAction, swapPlayer, assignMatchToCourt, createCourtAndAssignMatch, updateFee, togglePayment,
-      addPaymentMethod, deletePaymentMethod: deletePaymentMethodAction, refreshPaymentMethodsFromSupabase: refreshPaymentMethods, refreshSessionsFromSupabase: refreshSessions, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
+      addPaymentMethod, deletePaymentMethod: deletePaymentMethodAction, refreshPaymentMethods, refreshSessions, resetDailyBoard, wipeAllData, deleteMatch, setDefaultWinningScore, setAutoAdvanceEnabled,
       createSession, endSession, restoreSession, getSession, getCurrentSession, selectSession, registerPlayerForSession, importPlayerToSession, ingestPlayersFromList, saveSessionFee,
       saveCalculatorData, setPlayerResting, setPlayerAvailable,
       getPlayerCountForSession: (sessionId: string) => players.filter(p => p.sessionId === sessionId).length,

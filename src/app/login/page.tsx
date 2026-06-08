@@ -1,4 +1,4 @@
-import { LoginForm } from '@/components/auth/LoginForm'
+
 
 export default function LoginPage() {
   return (
@@ -8,7 +8,6 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-slate-900">Admin Login</h1>
           <p className="text-slate-600 mt-2">Badminton Queuing Management</p>
         </div>
-        <LoginForm />
       </div>
     </div>
   )
