@@ -1,6 +1,6 @@
 # MSW Badminton | Badminton Club Management
 
-A professional-grade badminton club management application built with **Next.js 15**, **Tailwind CSS**, and **Firebase**. Designed for live court queuing, deterministic matchmaking, and daily financial tracking.
+A professional-grade badminton club management application built with **Next.js 15**, **Tailwind CSS**, and **localStorage**. Designed for live court queuing, deterministic matchmaking, and daily financial tracking. No backend required — all data persists in the browser.
 
 ## 🚀 Key Features
 
@@ -33,6 +33,7 @@ Our deterministic engine ensures fair and socially diverse games:
     - Shuttlecock units used & price per unit.
     - Number of courts & hours played.
     - Optional club entry fees.
+- **Auto-Save**: Calculator inputs automatically persist — navigate away and come back without losing your work.
 - **Payment Tracking**: Real-time roster to mark players as "Paid" or "Pending".
 - **QR Code Payments**: Manage and display multiple QR codes (GCash, Maya, Bank) for quick club settlements.
 
@@ -47,6 +48,13 @@ Our deterministic engine ensures fair and socially diverse games:
 - **Styling**: Tailwind CSS + ShadCN UI
 - **Icons**: Lucide React
 - **Animations**: Tailwind CSS Animate + Custom Transitions
+
+## 💾 Data Persistence
+All application data (players, sessions, matches, courts, fees, payment methods) is stored in the browser's **localStorage**. This means:
+- **No internet required** — works completely offline
+- **No accounts needed** — open the app and start managing immediately
+- **Data stays on your device** — clear browser storage to reset
+- **Auto-save throughout** — inputs persist automatically as you type
 
 ---
 *Built with ❤️ by Rims for MSW Badminton Community.*
