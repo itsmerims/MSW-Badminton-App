@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, Trophy, Banknote, Settings, Plus, Zap, Swords, Sun, Moon, Menu, X, Undo2, Redo2, BarChart3, Medal, Wifi, WifiOff } from 'lucide-react';
+import { LayoutDashboard, Users, Trophy, Banknote, Settings, Plus, Zap, Swords, Sun, Moon, Menu, X, Undo2, Redo2, BarChart3, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useClub } from '@/context/ClubContext';
@@ -52,7 +52,6 @@ export default function Header() {
     { label: 'Players', href: currentSession ? `/sessions/${currentSession.id}/players` : '/players', icon: Users },
     { label: 'Matches', href: currentSession ? `/sessions/${currentSession.id}/matches` : '/matches', icon: Swords },
     { label: 'Statistics', href: currentSession ? `/sessions/${currentSession.id}/statistics` : '/statistics', icon: BarChart3 },
-    { label: 'Tournament', href: currentSession ? `/sessions/${currentSession.id}/tournament` : '/tournament', icon: Medal },
     { label: 'Rankings', href: currentSession ? `/sessions/${currentSession.id}/rankings` : '/rankings', icon: Trophy },
     { label: 'Fees', href: currentSession ? `/sessions/${currentSession.id}/fees` : '/fees', icon: Banknote },
     { label: 'Settings', href: currentSession ? `/sessions/${currentSession.id}/settings` : '/settings', icon: Settings },

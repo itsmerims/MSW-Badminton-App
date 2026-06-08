@@ -125,7 +125,7 @@ export default function RankingsPage() {
         <h1 className="flex items-center justify-center sm:justify-start gap-2 md:gap-3">
           <Trophy className="h-6 w-6 md:h-8 md:w-8 text-primary" /> Leaderboards
         </h1>
-        <p className="text-tiny text-muted-foreground font-black uppercase tracking-widest opacity-60">Hall of fame based on tournament stats</p>
+        <p className="text-tiny text-muted-foreground font-black uppercase tracking-widest opacity-60">Hall of fame based on match stats</p>
       </header>
 
       <Tabs defaultValue="daily" className="w-full">
